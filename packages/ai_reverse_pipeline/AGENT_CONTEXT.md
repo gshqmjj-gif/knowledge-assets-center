@@ -5,14 +5,12 @@
 
 ## Structured Project Constraints & Technical Capabilities:
 ### Target Entity: REA + Reverse-skill + PentAGI
-- **Purpose**: 分析我自己有权分析的软件功能
-- **Hardware Constraints**: 轻量级要求: 任意主流Mac/PC (8G+内存，无需高配独立显卡)
-- **Runtime Environment**: Docker 容器环境 + Node.js (>= 18) + MCP (Model Context Protocol) 插件协议客户端 + 反编译分析器 (Ghidra / IDA / Hopper)
-- **Deployment**: 🟢 100% 纯本地离线运行 (无需云端依赖，数据完全私有安全)
-- **Verified Advantages**: REA 社区背书极强 (GitHub 36万 Star); 比较实用的一点，是会给结论带证据，比如它看到了哪个文件、哪段代码、哪次运行结果; 会给结论带证据，比如它看到了哪个文件、哪段代码、哪次运行结果; 照着理解重写，不是抄对方的代码 [增量补充: 草稿鸭]; 有出处的解释，再帮你为自己的项目做一个类似版本 [增量补充: 草稿鸭]; 有出处的解释” [增量补充: 草稿鸭]
-- **Strict Pitfalls & Gotchas**: 禁止逆向和加混淆的别碰，这玩意儿只能拿来学习使用，只复刻允许复刻的软件，没有风险; 禁止逆向，有混淆加密的，不要去做技术对抗; Node 版本不对，MCP 没挂上，Docker 起不来，目标选得太大，AI 一口气吐出一大堆分析，看着挺热闹，其实能; 加混淆的别碰，这玩意儿只能拿来学习使用，只复刻允许复刻的软件，没有风险; 容易踩的坑
-
-### 小白看不懂的地方 [增量补充: 草稿鸭]; 痛点是：逆向/分析要用一堆工具，新手根本不知道该用哪个、怎么装 [增量补充: 草稿鸭]; 合规边界：仅限合法研究或已授权目标，禁止碰商业加混淆与加密对抗目标 [增量补充: 草稿鸭]; 依赖链繁琐：涉及多工具串联，需预先配齐 MCP 协议与指定运行时版本 [增量补充: 草稿鸭]
+- **Purpose**: 把 REA、Reverseskill、PentAGI 这三个 Skill 搭起来以后，能做一件挺完整的事：看到一个软件功能，先让 AI 去查它是怎么实现的，再按我们自己的技术栈写一个新版本，最后在上线前帮忙找一轮安全问题
+- **Hardware Constraints**: 轻量级要求: 任意主流Mac/PC (8G+内存，无需独显，轻量CPU即可)
+- **Runtime Environment**: Docker 容器环境 + Node.js (>= 18) + MCP (Model Context Protocol) 插件客户端 + 反编译分析器 (Ghidra / IDA)
+- **Deployment**: 🟢 本地命令行/独立工具 (无强联网依赖)
+- **Verified Advantages**: 【社区验证】核心组件在 GitHub 斩获 36万 Star，能力经过广泛开源社区实战验证。; 【结论可查】推演带证据链追溯：它比较实用的一点，是会给结论带证据，比如它看到了哪个文件、哪段代码、哪次运行结果; 【干净复刻】基于行为推演重写自主版本，有效规避版权与混淆对抗风险。; 【端到端协同】从目标分析、环境依赖配齐到安全初筛，构建一体化工作流。; 【成熟生态】工具链模块解耦度高，支持快速组合并无缝嵌入现有工程流。 [补充: 草稿鸭]
+- **Strict Pitfalls & Gotchas**: 【合规红线】严禁技术对抗：这一套组合下来，基本能复刻任何软件，但禁止逆向和加混淆的别碰，这玩意儿只能拿来学习使用，只复刻允许复刻的软件，没有风险; 【环境排错】多工具链依赖配置：Node 版本不对，MCP 没挂上，Docker 起不来，目标选得太大，AI 一口气吐出一大堆分析，看着挺热闹，其实能用的没几条; 【复刻边界】严禁机械抄袭：很多人看到“复刻软件”，第一反应是把别人的东西原样搬过来; 【安全界限】自动化检测仅为辅助：PentAGI 能帮忙找问题，但不能拿它当系统安全的证明
 
 ## Project Constraints & Directives for Agent:
 1. You are operating as an expert specialist in AI逆向分析与软件复刻流水线.

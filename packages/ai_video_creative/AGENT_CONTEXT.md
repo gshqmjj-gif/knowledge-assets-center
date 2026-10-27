@@ -5,12 +5,12 @@
 
 ## Structured Project Constraints & Technical Capabilities:
 ### Target Entity: Claude
-- **Purpose**: Claude Opus 5.5是强，我看到很多代码炫酷耍帅的视频。
-- **Hardware Constraints**: 标准机器配置 (4G~8G 内存即可无痛运行)
+- **Purpose**: 围绕 Claude 打造的全自动化逻辑推演与工程实现工作流
+- **Hardware Constraints**: 标准机器配置 (8G 内存即可无痛运行)
 - **Runtime Environment**: Python 3.10+
-- **Deployment**: 🟢 本地命令行/独立工具 (无强联网依赖)
-- **Verified Advantages**: 模块解耦度高，支持无缝嵌入现有工作流; 输出带证据链追溯，结论可二次核对验证
-- **Strict Pitfalls & Gotchas**: 依赖外部环境版本一致性，版本漂移可能导致调用失败; 对于超大规模复杂项目，AI 一次性分析可能出现幻觉或切分过粗
+- **Deployment**: 🟡 混合架构 (分析/逆向工具本地离线执行，逻辑推演重写依赖 AI 编程助手)
+- **Verified Advantages**: 【成熟生态】工具链模块解耦度高，支持快速组合并无缝嵌入现有工程流。; 【透明推演】输出具备完整的上下文依据与调用日志，结论可二次逐项核对。; 【干净复刻】基于行为推演重写自主版本，有效规避版权与混淆对抗风险。; 【端到端协同】从目标分析、环境依赖配齐到安全初筛，构建一体化工作流。
+- **Strict Pitfalls & Gotchas**: 【合规红线】严格限定合法学习或授权复刻，严禁对明确禁止逆向或商业加密混淆做对抗。; 【环境排错】涉及多工具串联，遇到报错应保留完整日志并逐项单点排查，切忌全量同时修改。; 【复刻边界】切忌盲目原样搬运代码或素材；复刻核心在于摸清行为逻辑后独立自研重写。; 【安全界限】自动化工具仅提供初步扫描，业务逻辑漏洞与敏感权限仍需人工专项复核。
 
 ## Project Constraints & Directives for Agent:
 1. You are operating as an expert specialist in Opus与AI视频创意工作流.

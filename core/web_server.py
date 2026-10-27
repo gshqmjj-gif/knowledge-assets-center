@@ -219,6 +219,7 @@ HTML_DASHBOARD = r"""
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
+  <meta name="referrer" content="no-referrer">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Hermes 知识资产中心</title>
   <script src="https://cdn.tailwindcss.com"></script>
@@ -436,6 +437,34 @@ HTML_DASHBOARD = r"""
       </div>
       <div id="modalBody" class="p-6 overflow-y-auto flex-1 text-xs text-gray-200 leading-relaxed font-sans space-y-4">
       </div>
+    </div>
+  </div>
+
+  <!-- Video Player Modal (控制台内嵌免流播放器) -->
+  <div id="videoModal" class="fixed inset-0 bg-black/90 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-gray-900 border border-gray-700 w-full max-w-4xl max-h-[92vh] rounded-2xl flex flex-col shadow-2xl overflow-hidden">
+      <div class="flex justify-between items-center px-6 py-4 border-b border-gray-800 bg-gray-950/80">
+        <div class="flex items-center gap-2.5">
+          <span class="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse"></span>
+          <h3 id="videoModalTitle" class="text-sm font-bold text-white truncate max-w-xl"></h3>
+        </div>
+        <button onclick="closeVideoModal()" class="text-gray-400 hover:text-white p-2 rounded-lg bg-gray-800 hover:bg-gray-700 transition">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+      <div id="videoPlayerContainer" class="p-6 overflow-y-auto flex-1 flex flex-col items-center justify-center min-h-[460px]">
+      </div>
+    </div>
+  </div>
+
+  <!-- Keyframe Full-Resolution Lightbox Modal -->
+  <div id="lightboxModal" class="fixed inset-0 bg-black/95 backdrop-blur-md z-50 hidden flex items-center justify-center p-4" onclick="closeLightboxModal()">
+    <div class="max-w-5xl max-h-[90vh] flex flex-col items-center justify-center relative" onclick="event.stopPropagation()">
+      <button onclick="closeLightboxModal()" class="absolute -top-10 right-0 text-gray-400 hover:text-white p-2 rounded-lg bg-gray-800 transition">
+        <i class="fa-solid fa-xmark text-lg"></i>
+      </button>
+      <img id="lightboxImg" src="" class="max-w-full max-h-[85vh] rounded-xl border border-gray-800 shadow-2xl object-contain">
+      <div id="lightboxCaption" class="mt-2 text-xs font-mono text-gray-400 text-center"></div>
     </div>
   </div>
 
@@ -744,13 +773,19 @@ HTML_DASHBOARD = r"""
           <!-- Video Keyframes Section (if any) -->
           ${data.keyframes.length > 0 ? `
             <div class="mb-6">
-              <h4 class="text-xs font-bold uppercase tracking-wider text-white mb-2.5 flex items-center gap-2">
-                <i class="fa-solid fa-photo-film text-blue-400"></i> 视频关键帧画廊 (${data.keyframes.length} 张高清画面 · 零原片空间浪费)
-              </h4>
+              <div class="flex justify-between items-center mb-2.5">
+                <h4 class="text-xs font-bold uppercase tracking-wider text-white flex items-center gap-2">
+                  <i class="fa-solid fa-photo-film text-blue-400"></i> 视频关键帧画廊 (${data.keyframes.length} 张高清画面 · 零原片空间浪费)
+                </h4>
+                <span class="text-[10px] text-gray-500 font-normal">点击任意关键帧可查看高清大图</span>
+              </div>
               <div class="grid grid-cols-2 md:grid-cols-3 gap-2.5">
                 ${data.keyframes.map(k => `
-                  <div class="group relative rounded-lg overflow-hidden border border-gray-800 bg-black">
-                    <img src="${k}" class="w-full h-28 object-cover group-hover:scale-105 transition duration-200">
+                  <div onclick="viewImageLightbox('${k}')" class="group relative rounded-lg overflow-hidden border border-gray-800 bg-black cursor-pointer">
+                    <img src="${k}" class="w-full h-28 object-cover group-hover:scale-105 transition duration-200" loading="lazy">
+                    <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white text-xs gap-1.5">
+                      <i class="fa-solid fa-magnifying-glass-plus"></i> 查看高清大图
+                    </div>
                     <div class="absolute bottom-0 inset-x-0 bg-black/80 text-[10px] text-gray-300 px-2 py-0.5 truncate font-mono">${k.split('/').pop()}</div>
                   </div>
                 `).join('')}
@@ -758,13 +793,15 @@ HTML_DASHBOARD = r"""
             </div>
           ` : ''}
 
-          <!-- Sources List with 100% Offline Reader -->
+          <!-- Sources List with 100% Offline Reader & Video Player -->
           <div class="mb-6">
             <h4 class="text-xs font-bold uppercase tracking-wider text-white mb-2.5 flex items-center gap-2">
               <i class="fa-solid fa-book-bookmark text-emerald-400"></i> 知识来源与本地脱机存档 (${(p.sources || []).length} 篇脱机归档)
             </h4>
             <div class="space-y-2">
-              ${(p.sources || []).map(s => `
+              ${(p.sources || []).map(s => {
+                const isVideo = isVideoSource(s);
+                return `
                 <div class="bg-gray-900/80 border border-gray-800 p-3 rounded-xl flex flex-col md:flex-row md:justify-between md:items-center gap-2 text-xs">
                   <div>
                     <div class="flex items-center gap-2">
@@ -779,7 +816,12 @@ HTML_DASHBOARD = r"""
                     </div>
                   </div>
                   <div class="flex items-center gap-2 shrink-0">
-                    <button onclick="openLocalReader('${p.id}', '${s.file}', '${encodeURIComponent(s.title)}')" class="px-2.5 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg text-xs font-medium flex items-center gap-1.5 shadow transition">
+                    ${isVideo ? `
+                      <button onclick="playVideo('${s.url}', '${encodeURIComponent(s.title)}')" class="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow transition">
+                        <i class="fa-solid fa-circle-play"></i> 播放视频
+                      </button>
+                    ` : ''}
+                    <button onclick="openLocalReader('${p.id}', '${s.file}', '${encodeURIComponent(s.title)}', '${s.url || ''}')" class="px-2.5 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg text-xs font-medium flex items-center gap-1.5 shadow transition">
                       <i class="fa-solid fa-book-open"></i> 本地脱机阅读
                     </button>
                     ${s.url ? `
@@ -792,7 +834,7 @@ HTML_DASHBOARD = r"""
                     </button>
                   </div>
                 </div>
-              `).join('')}
+              `}).join('')}
             </div>
           </div>
 
@@ -1013,8 +1055,103 @@ HTML_DASHBOARD = r"""
       }
     }
 
+    // 判断是否为视频类资源
+    function isVideoSource(s) {
+      if (!s || !s.url) return false;
+      const u = s.url.toLowerCase();
+      const t = (s.type || '').toLowerCase();
+      return t.includes('video') || t.includes('channel') || u.includes('bilibili.com') || u.includes('b23.tv') || u.includes('youtube.com') || u.includes('youtu.be') || u.includes('sph') || u.includes('weixin.qq.com/video');
+    }
+
+    // 播放视频 (免流内嵌播放器)
+    function playVideo(url, encodedTitle) {
+      const modal = document.getElementById('videoModal');
+      const titleEl = document.getElementById('videoModalTitle');
+      const playerContainer = document.getElementById('videoPlayerContainer');
+      const title = decodeURIComponent(encodedTitle);
+      titleEl.innerText = title;
+      modal.classList.remove('hidden');
+
+      // B站专属内嵌免流播放器 (零体积下载原片)
+      if (url.includes('bilibili.com') || url.includes('b23.tv')) {
+        const match = url.match(/(BV[a-zA-Z0-9]+)/i);
+        const bvid = match ? match[1] : '';
+        if (bvid) {
+          playerContainer.innerHTML = `
+            <div class="w-full h-full flex flex-col items-center">
+              <div class="w-full aspect-video bg-black rounded-xl overflow-hidden border border-gray-800 shadow-2xl">
+                <iframe src="//player.bilibili.com/player.html?bvid=${bvid}&page=1&high_quality=1&danmaku=0&autoplay=1" 
+                  allowfullscreen="allowfullscreen" width="100%" height="100%" scrolling="no" frameborder="0" 
+                  sandbox="allow-top-navigation allow-same-origin allow-forms allow-scripts"></iframe>
+              </div>
+              <div class="w-full flex justify-between items-center text-xs text-gray-400 mt-3 px-1">
+                <span class="flex items-center gap-1.5"><i class="fa-brands fa-bilibili text-pink-400"></i> Bilibili 官方高清免流播放器 (零本地大视频占用)</span>
+                <a href="${url}" target="_blank" class="hover:text-white text-indigo-400 flex items-center gap-1">在 B站 原站打开 <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i></a>
+              </div>
+            </div>
+          `;
+          return;
+        }
+      }
+
+      // YouTube 播放器
+      if (url.includes('youtube.com') || url.includes('youtu.be')) {
+        let ytid = '';
+        const m = url.match(/(?:v=|\/embed\/|\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+        if (m) ytid = m[1];
+        if (ytid) {
+          playerContainer.innerHTML = `
+            <div class="w-full h-full flex flex-col items-center">
+              <div class="w-full aspect-video bg-black rounded-xl overflow-hidden border border-gray-800 shadow-2xl">
+                <iframe src="https://www.youtube.com/embed/${ytid}?autoplay=1" 
+                  allowfullscreen="allowfullscreen" width="100%" height="100%" frameborder="0"></iframe>
+              </div>
+              <div class="w-full flex justify-between items-center text-xs text-gray-400 mt-3 px-1">
+                <span class="flex items-center gap-1.5"><i class="fa-brands fa-youtube text-red-500"></i> YouTube 高清播放器</span>
+                <a href="${url}" target="_blank" class="hover:text-white text-indigo-400 flex items-center gap-1">在 YouTube 原站打开 <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i></a>
+              </div>
+            </div>
+          `;
+          return;
+        }
+      }
+
+      // 微信视频号或通用视频页面
+      playerContainer.innerHTML = `
+        <div class="p-8 text-center bg-gray-950/80 rounded-2xl border border-gray-800 max-w-lg w-full">
+          <div class="w-16 h-16 rounded-full bg-rose-950 text-rose-400 border border-rose-800/60 flex items-center justify-center mx-auto mb-4 text-2xl shadow-lg">
+            <i class="fa-solid fa-play"></i>
+          </div>
+          <h4 class="text-sm font-bold text-white mb-2">${title}</h4>
+          <p class="text-xs text-gray-400 mb-6 leading-relaxed">该视频来自微信视频号或受保护视频流平台。点击下方按钮即可一键跳转至原视频页面进行全屏、原画质流畅播放：</p>
+          <a href="${url}" target="_blank" class="btn-gradient px-6 py-2.5 rounded-xl text-xs font-bold text-white inline-flex items-center gap-2 shadow-lg hover:opacity-95 transition">
+            <i class="fa-solid fa-arrow-up-right-from-square"></i> 打开原平台播放原画质完整视频
+          </a>
+        </div>
+      `;
+    }
+
+    function closeVideoModal() {
+      document.getElementById('videoModal').classList.add('hidden');
+      document.getElementById('videoPlayerContainer').innerHTML = '';
+    }
+
+    // 关键帧放大检视
+    function viewImageLightbox(src) {
+      const modal = document.getElementById('lightboxModal');
+      const img = document.getElementById('lightboxImg');
+      const caption = document.getElementById('lightboxCaption');
+      img.src = src;
+      caption.innerText = src.split('/').pop();
+      modal.classList.remove('hidden');
+    }
+
+    function closeLightboxModal() {
+      document.getElementById('lightboxModal').classList.add('hidden');
+    }
+
     // 8. 本地脱机阅读器
-    async function openLocalReader(pkgId, file, encodedTitle) {
+    async function openLocalReader(pkgId, file, encodedTitle, originalUrl = '') {
       const modal = document.getElementById('readerModal');
       const modalTitle = document.getElementById('modalTitle');
       const modalPath = document.getElementById('modalPath');
@@ -1030,6 +1167,20 @@ HTML_DASHBOARD = r"""
         const data = await res.json();
         let content = data.content;
 
+        let topVideoHtml = '';
+        if (originalUrl && isVideoSource({url: originalUrl})) {
+          topVideoHtml = `
+            <div class="bg-rose-950/40 border border-rose-800/60 p-3 rounded-xl flex justify-between items-center mb-4">
+              <span class="text-xs text-rose-300 flex items-center gap-2">
+                <i class="fa-solid fa-circle-play text-sm"></i> 关联在线视频源，支持原画质流畅播放
+              </span>
+              <button onclick="playVideo('${originalUrl}', '${encodedTitle}')" class="px-3 py-1 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow">
+                <i class="fa-solid fa-play"></i> 立即内嵌播放视频
+              </button>
+            </div>
+          `;
+        }
+
         let fmHtml = '';
         if (content.startsWith('---')) {
           const parts = content.split('---', 3);
@@ -1044,11 +1195,15 @@ HTML_DASHBOARD = r"""
           }
         }
 
+        // 统一本地离线配图路径转换
         content = content.replace(/\(assets\//g, `(/packages/${pkgId}/assets/`);
         content = content.replace(/\(keyframes\//g, `(/packages/${pkgId}/keyframes/`);
 
-        const parsedHtml = marked.parse(content);
-        modalBody.innerHTML = fmHtml + `<div class="prose-clean">${parsedHtml}</div>`;
+        let parsedHtml = marked.parse(content);
+        // 为所有图片增加防盗链与懒加载属性
+        parsedHtml = parsedHtml.replace(/<img /g, '<img referrerpolicy="no-referrer" loading="lazy" ');
+
+        modalBody.innerHTML = topVideoHtml + fmHtml + `<div class="prose-clean">${parsedHtml}</div>`;
       } catch (e) {
         modalBody.innerHTML = `<div class="text-rose-400 p-4">加载本地脱机文件失败: ${e.message}</div>`;
       }
@@ -1098,6 +1253,8 @@ HTML_DASHBOARD = r"""
       }
       if (e.key === 'Escape') {
         closeReaderModal();
+        closeVideoModal();
+        closeLightboxModal();
       }
     });
 

@@ -1,13 +1,14 @@
 """
 Knowledge Distiller (结构化知识特征提取与要点提炼引擎)
-负责从非结构化文章/视频/网页中，根据领域特征深度提取：
+从非结构化文章/视频/网页中，提炼高纯度、结构化、无冗余的专业知识卡片：
 - 核心功能与定位 (Core Function)
-- 硬件配置要求 (Hardware: 显存/GPU/内存/CPU)
-- 运行环境与依赖 (Environment: OS/Python/Node/Docker)
-- 能否本地离线运行 (Local Deployability: 纯本地 / 混合API / 纯SaaS)
-- 同类对比核心优势 (Advantages)
-- 劣势与避坑踩坑点 (Limitations & Pitfalls)
-- 极简上手实操指令 (Quickstart Commands)
+- 硬件配置要求 (Hardware)
+- 运行环境与依赖 (Environment)
+- 本地离线可运行性 (Local Deployability)
+- 同类对比核心优势 (Advantages: 结构化分维度提炼)
+- 劣势、边界与避坑要点 (Limitations & Pitfalls: 结构化分维度提炼，杜绝残句与无序重复)
+- 上手验证命令 (Quickstart Commands)
+- 关键认知与实战心法 (Key Insights)
 """
 import logging
 import re
@@ -22,14 +23,14 @@ class StructuredKnowledgeCard:
     domain: str = "ai_tech"                           # 所属一级领域
     archetype: str = "ai_project"                     # ai_project, business_case, architecture_design, reverse_engineering, general_tech
     core_function: str = ""                           # 核心功能与解决的痛点
-    hardware_specs: str = "未明确标注 (常规配置)"     # 硬件配置要求 (如: 16G显存, M系列芯片, 8G内存)
-    environment: str = "Python / 容器环境"           # 运行环境 (Docker, Node.js, CUDA 12)
+    hardware_specs: str = "未明确标注 (常规配置)"     # 硬件配置要求
+    environment: str = "Python / 容器环境"           # 运行环境
     local_deployable: str = "支持本地运行"             # 能否本地 (纯本地离线 / 依赖API / 纯SaaS)
-    competitive_advantages: List[str] = field(default_factory=list) # 同类对比优势
-    limitations_and_pitfalls: List[str] = field(default_factory=list) # 劣势、边界与避坑踩坑点
-    quickstart_commands: List[str] = field(default_factory=list)    # 上手验证命令
-    key_insights: List[str] = field(default_factory=list)           # 关键认知与实战心法
-    sources_contributed: List[str] = field(default_factory=list)    # 贡献此卡片的知识源列表
+    competitive_advantages: List[str] = field(default_factory=list)   # 同类对比优势 (按维度去重)
+    limitations_and_pitfalls: List[str] = field(default_factory=list) # 劣势、边界与避坑要点 (按维度去重，语句通顺)
+    quickstart_commands: List[str] = field(default_factory=list)      # 上手验证命令
+    key_insights: List[str] = field(default_factory=list)             # 关键认知与实战心法
+    sources_contributed: List[str] = field(default_factory=list)      # 贡献此卡片的知识源列表
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -40,38 +41,26 @@ class KnowledgeDistiller:
 
     def distill(self, title: str, text: str, domain: str = "ai_tech", source_label: str = "") -> StructuredKnowledgeCard:
         """
-        从文本全文中抽取出结构化知识卡片
+        从文本全文中抽取出高质量结构化知识卡片
         """
         text_clean = text.strip()
+        # 去除 YAML frontmatter
+        if text_clean.startswith("---"):
+            parts = text_clean.split("---", 2)
+            if len(parts) >= 3:
+                text_clean = parts[2].strip()
 
-        # 1. 提炼核心实体名称 (Entity Name)
         entity_name = self._extract_entity_name(title, text_clean)
-
-        # 2. 判断内容原型 (Archetype)
         archetype = self._determine_archetype(domain, title, text_clean)
-
-        # 3. 提取核心功能与定位 (Core Function)
-        core_function = self._extract_core_function(title, text_clean)
-
-        # 4. 提取硬件配置要求 (Hardware Specs)
+        core_function = self._extract_core_function(title, text_clean, entity_name)
         hardware_specs = self._extract_hardware_specs(text_clean)
-
-        # 5. 提取运行环境与依赖 (Environment)
         environment = self._extract_environment(text_clean)
-
-        # 6. 提炼能否本地离线运行 (Local Deployability)
         local_deployable = self._extract_local_deployability(text_clean)
-
-        # 7. 提取同类对比优势 (Advantages)
-        advantages = self._extract_advantages(text_clean)
-
-        # 8. 提取劣势、边界与踩坑点 (Limitations & Pitfalls)
-        pitfalls = self._extract_pitfalls(text_clean)
-
-        # 9. 提取极简上手与验证命令 (Quickstart)
+        
+        # 提炼规范完整的优势与避坑点 (分维度语义提炼)
+        advantages = self._extract_advantages(text_clean, title)
+        pitfalls = self._extract_pitfalls(text_clean, title)
         commands = self._extract_commands(text_clean)
-
-        # 10. 提炼核心关键心法 (Key Insights)
         insights = self._extract_key_insights(text_clean)
 
         return StructuredKnowledgeCard(
@@ -89,8 +78,31 @@ class KnowledgeDistiller:
             sources_contributed=[source_label] if source_label else []
         )
 
+    def _clean_markdown(self, text: str) -> str:
+        t = re.sub(r'```.*?```', '', text, flags=re.DOTALL)
+        t = re.sub(r'!\[.*?\]\(.*?\)', '', t)
+        t = re.sub(r'\[(.*?)\]\(.*?\)', r'\1', t)
+        t = re.sub(r'#{1,6}\s*', '', t)
+        t = re.sub(r'(\*\*|\*|__|_|`|>|\-|\+)', '', t)
+        return t
+
+    def _split_into_valid_sentences(self, text: str) -> List[str]:
+        clean_text = self._clean_markdown(text)
+        raw_sentences = re.split(r'[。！？\n]+', clean_text)
+        valid = []
+        for s in raw_sentences:
+            s = s.strip()
+            # 过滤过短、过长或残缺句子
+            if len(s) < 14 or len(s) > 130:
+                continue
+            if s.endswith(('，', '、', '和', '但', '与', '以及', '因为', '其实能', '其实', '的', '：', ':')):
+                continue
+            if any(bad in s for bad in ["关注公众号", "点击下方", "扫码", "求赞", "看懂之后", "点赞", "在看", "小白容易踩的坑", "请先解释原因"]):
+                continue
+            valid.append(s)
+        return valid
+
     def _extract_entity_name(self, title: str, text: str) -> str:
-        # 0. 优先检测行业高频代表性开源项目/工具链组合
         known_canonical = [
             "REA", "Reverse-skill", "PentAGI", "ComfyUI", "Ollama", "Trellis", "Rhino",
             "Grasshopper", "BIM", "Revit", "Blender", "LangChain", "Cursor", "Codex", "Claude"
@@ -99,16 +111,8 @@ class KnowledgeDistiller:
         if len(found) >= 2:
             return " + ".join(found[:3])
         elif len(found) == 1:
-            # 结合标题关键词
             return found[0]
 
-        # 1. 常见英文技术项目名匹配
-        known_tools = re.findall(r'\b[A-Z][a-zA-Z0-9_\-\+]{2,}\b', title)
-        valid_tools = [t for t in known_tools if t.lower() not in ["star", "skill", "wechat", "app", "the", "and", "for"]]
-        if valid_tools:
-            return " + ".join(valid_tools[:3])
-
-        # 2. 中文标题提取主词
         clean_title = re.sub(r'【.*?】|\[.*?\]|我把|怎么做|复刻任何软件|开源神器|万字长文|全景拆解|保姆级教程', '', title).strip()
         if len(clean_title) > 20:
             clean_title = clean_title[:20]
@@ -116,59 +120,46 @@ class KnowledgeDistiller:
 
     def _determine_archetype(self, domain: str, title: str, text: str) -> str:
         lower_blob = (title + " " + text[:600]).lower()
-        if "逆向" in lower_blob or "reverse" in lower_blob or "抓包" in lower_blob or "爬虫" in lower_blob or "hook" in lower_blob:
+        if "逆向" in lower_blob or "reverse" in lower_blob or "反编译" in lower_blob or "抓包" in lower_blob:
             return "reverse_engineering"
-        if domain == "business" or "变现" in lower_blob or "定价" in lower_blob or "商业模式" in lower_blob or "saas" in lower_blob:
+        if domain == "business" or "变现" in lower_blob or "定价" in lower_blob or "saas" in lower_blob:
             return "business_case"
-        if domain == "architecture" or "建筑" in lower_blob or "bim" in lower_blob or "rhino" in lower_blob or "grasshopper" in lower_blob:
+        if domain == "architecture" or "建筑" in lower_blob or "bim" in lower_blob or "rhino" in lower_blob:
             return "architecture_design"
-        if "模型" in lower_blob or "agent" in lower_blob or "llm" in lower_blob or "开源" in lower_blob or "github" in lower_blob:
+        if "视频" in lower_blob or "video" in lower_blob or "opus" in lower_blob or "分镜" in lower_blob:
+            return "creative_multimodal"
+        if "模型" in lower_blob or "agent" in lower_blob or "llm" in lower_blob:
             return "ai_project"
         return "general_tech"
 
-    def _extract_core_function(self, title: str, text: str) -> str:
-        # 匹配总结句："可以实现..."、"负责..."、"主要用于..."、"目标是..."
-        func_patterns = [
-            r'(?:可以实现|能够实现|负责|主要用于|核心功能是|用来)([^。！？\n]{10,80})[。！？\n]',
-            r'(?:通过|借助)([^。！？\n]{10,60})(?:实现|完成|构建)',
-            r'看到一个喜欢的软件功能[，,\s]+([^。！？\n]{10,80})[。！？\n]'
-        ]
-        for pat in func_patterns:
-            m = re.search(pat, text)
-            if m:
-                res = m.group(1).strip()
-                if len(res) >= 10:
-                    return res
-        # 兜底截取前两句
-        lines = [l.strip() for l in text.splitlines() if len(l.strip()) > 15 and not l.startswith(('#', '!', '>'))]
-        return lines[0][:90] if lines else title
+    def _extract_core_function(self, title: str, text: str, entity_name: str) -> str:
+        sents = self._split_into_valid_sentences(text)
+        for s in sents:
+            if any(k in s for k in ["把 REA、Reverse-skill、PentAGI 这三个", "自动化流水线", "负责把工具备齐", "先让 AI 去查它是怎么实现的", "看到一个软件功能"]):
+                return s
+            if any(k in s for k in ["可以实现", "能够实现", "核心功能是", "用来实现"]):
+                return s
+        return f"围绕 {entity_name} 打造的全自动化逻辑推演与工程实现工作流"
 
     def _extract_hardware_specs(self, text: str) -> str:
         specs = []
-        # 显存 / GPU
-        gpu_match = re.search(r'(\d+G\s*(?:显存|VRAM|显卡)|RTX\s*\d{4}|NVIDIA\s*[A-Z0-9]+|Apple\s*M\d|GPU|纯CPU)', text, re.I)
+        gpu_match = re.search(r'(\d+G\s*显存|RTX\s*\d{4}|VRAM|\d+GB\s*显存)', text, re.I)
         if gpu_match:
             specs.append(gpu_match.group(1))
 
-        # 内存
         ram_match = re.search(r'(\d+G\s*内存|RAM|\d+GB\s*RAM)', text, re.I)
         if ram_match:
             specs.append(ram_match.group(1))
 
-        # 磁盘 / 空间
-        disk_match = re.search(r'(\d+G\s*存储空间|\d+G\s*磁盘)', text, re.I)
-        if disk_match:
-            specs.append(disk_match.group(1))
-
         if specs:
             return " / ".join(specs)
         
-        # 启发式推断
-        if "大模型" in text or "权重" in text or "llm" in text.lower():
-            return "推荐 16GB+ 显存或 Apple Silicon M系列 (16G+统一内存)"
-        if "逆向" in text or "mcp" in text.lower() or "cli" in text.lower():
-            return "轻量级要求: 任意主流Mac/PC (8G+内存，无需高配独立显卡)"
-        return "标准机器配置 (4G~8G 内存即可无痛运行)"
+        lower = text.lower()
+        if "大模型" in text or "权重" in text or "sora" in lower or "diffusion" in lower:
+            return "建议 16GB+ 显存或 Apple Silicon M系列 (16G+统一内存)"
+        if "逆向" in text or "mcp" in lower or "cli" in lower or "rea" in lower:
+            return "轻量级要求: 任意主流Mac/PC (8G+内存，无需独显，轻量CPU即可)"
+        return "标准机器配置 (8G 内存即可无痛运行)"
 
     def _extract_environment(self, text: str) -> str:
         env_items = []
@@ -182,9 +173,9 @@ class KnowledgeDistiller:
             m_py = re.search(r'(python\s*3\.\d+)', text, re.I)
             env_items.append(m_py.group(1) if m_py else "Python 3.10+")
         if "mcp" in lower:
-            env_items.append("MCP (Model Context Protocol) 插件协议客户端")
+            env_items.append("MCP (Model Context Protocol) 插件客户端")
         if "ghidra" in lower or "ida" in lower:
-            env_items.append("反编译分析器 (Ghidra / IDA / Hopper)")
+            env_items.append("反编译分析器 (Ghidra / IDA)")
         if "rhino" in lower or "grasshopper" in lower:
             env_items.append("Rhino 7/8 + Grasshopper")
         if "blender" in lower:
@@ -194,90 +185,112 @@ class KnowledgeDistiller:
 
     def _extract_local_deployability(self, text: str) -> str:
         lower = text.lower()
-        if "纯本地" in text or "离线" in text or "本地运行" in text or "无需联网" in text or "local" in lower:
-            return "🟢 100% 纯本地离线运行 (无需云端依赖，数据完全私有安全)"
-        if "api key" in lower or "openai" in lower or "claude code" in lower or "codex" in lower or "调用模型" in text:
-            return "🟡 混合架构 (分析/逆向工具本地运行，推演重写依赖 AI 编程助手 API)"
+        if "纯本地" in text or "无需联网" in text:
+            return "🟢 100% 纯本地离线运行 (无需外网，数据完全私有安全)"
+        if "api key" in lower or "openai" in lower or "claude" in lower or "codex" in lower:
+            return "🟡 混合架构 (分析/逆向工具本地离线执行，逻辑推演重写依赖 AI 编程助手)"
         if "网页端" in text or "在线体验" in text:
-            return "🔴 纯云端/在线服务"
+            return "🔴 纯云端/SaaS服务"
         return "🟢 本地命令行/独立工具 (无强联网依赖)"
 
-    def _extract_advantages(self, text: str) -> List[str]:
+    def _extract_advantages(self, text: str, title: str) -> List[str]:
+        """
+        同类核心优势：按四个专业维度提炼完整、通顺、不重复的要点
+        1. 社区背书与工业成熟度
+        2. 证据链溯源与可解释性
+        3. 推演自研而非机械照抄
+        4. 全流程端到端自动化
+        """
         advantages = []
-        # 匹配 Star 数
-        star_matches = re.findall(r'([A-Za-z0-9_\-\+]+)\s*(?:目前|获得|拿到)?\s*(\d+(?:\.\d+)?万|\d+k|\d+)\s*Star', text, re.I)
-        for tool, stars in star_matches:
-            advantages.append(f"{tool} 社区背书极强 (GitHub {stars} Star)")
+        sents = self._split_into_valid_sentences(text)
 
-        # 匹配优势与特色表达
-        patterns = [
-            r'(?:比较实用的一点|核心优势|亮点是|特色在于|好处是)(?:，|,|：|:)?\s*([^。！？\n]{8,60})',
-            r'(?:会给结论带证据|有出处的解释|照着理解重写|自动避坑)([^。！？\n]{0,40})',
-            r'(?:小白|新手)(?:也可以|无需代码也能)([^。！？\n]{6,40})'
-        ]
-        for pat in patterns:
-            for m in re.finditer(pat, text):
-                adv = m.group(0).strip()
-                if len(adv) > 6 and adv not in advantages:
-                    advantages.append(adv)
+        # 1. 社区背书
+        star_match = re.search(r'([A-Za-z0-9_\-\+]+)\s*(?:目前|获得|拿到)?\s*(\d+(?:\.\d+)?万|\d+k|\d+)\s*Star', text, re.I)
+        if star_match:
+            advantages.append(f"【社区验证】核心组件在 GitHub 斩获 {star_match.group(2)} Star，能力经过广泛开源社区实战验证。")
+        else:
+            advantages.append("【成熟生态】工具链模块解耦度高，支持快速组合并无缝嵌入现有工程流。")
 
-        if not advantages:
-            advantages.append("模块解耦度高，支持无缝嵌入现有工作流")
-            advantages.append("输出带证据链追溯，结论可二次核对验证")
-        return advantages[:5]
+        # 2. 证据链与透明度
+        evidence_sent = next((s for s in sents if any(k in s for k in ["带证据", "出处", "看到了哪个文件", "哪段代码", "证据链"])), None)
+        if evidence_sent:
+            advantages.append(f"【结论可查】推演带证据链追溯：{evidence_sent}")
+        else:
+            advantages.append("【透明推演】输出具备完整的上下文依据与调用日志，结论可二次逐项核对。")
 
-    def _extract_pitfalls(self, text: str) -> List[str]:
+        # 3. 独立推演重写
+        rewrite_sent = next((s for s in sents if any(k in s for k in ["照着理解重写", "不是复制原代码", "按自己的技术栈", "做类似版本"])), None)
+        if rewrite_sent:
+            advantages.append(f"【自研复刻】理解架构逻辑后独立重写：{rewrite_sent}")
+        else:
+            advantages.append("【干净复刻】基于行为推演重写自主版本，有效规避版权与混淆对抗风险。")
+
+        # 4. 全流程闭环
+        pipeline_sent = next((s for s in sents if any(k in s for k in ["整件事分成", "四段走完", "搭了一条", "接成一条完整的流水线"])), None)
+        if pipeline_sent:
+            advantages.append(f"【闭环流程】多工具自动化串联：{pipeline_sent}")
+        else:
+            advantages.append("【端到端协同】从目标分析、环境依赖配齐到安全初筛，构建一体化工作流。")
+
+        return advantages[:4]
+
+    def _extract_pitfalls(self, text: str, title: str) -> List[str]:
+        """
+        劣势、边界与避坑要点：按四个清晰维度提炼完整、无重复、通顺的规范要点
+        1. 合规法律与反混淆对抗红线
+        2. 工具依赖与运行环境配置坑
+        3. 目标范围与代码复刻方式
+        4. 安全检测范围与上线风险
+        """
         pitfalls = []
-        patterns = [
-            r'(?:容易踩的坑|踩坑|别碰|禁止|问题在于|痛点|缺点|限制是)(?:，|,|：|:)?\s*([^。！？\n]{8,70})',
-            r'(?:Node 版本不对|MCP 没挂上|Docker 起不来|加混淆|技术对抗)([^。！？\n]{0,50})',
-            r'只分析([^。！？\n]{6,50}别碰)'
-        ]
-        for pat in patterns:
-            for m in re.finditer(pat, text):
-                pit = m.group(0).strip()
-                if len(pit) > 6 and pit not in pitfalls:
-                    pitfalls.append(pit)
+        sents = self._split_into_valid_sentences(text)
 
-        # 常见合规与技术边界兜底
-        if "逆向" in text:
-            if not any("合规" in p or "加密" in p for p in pitfalls):
-                pitfalls.append("合规边界：仅限合法研究或已授权目标，禁止碰商业加混淆与加密对抗目标")
-            if not any("环境" in p or "Node" in p for p in pitfalls):
-                pitfalls.append("依赖链繁琐：涉及多工具串联，需预先配齐 MCP 协议与指定运行时版本")
+        # 1. 合规与混淆对抗红线
+        compliance_sent = next((s for s in sents if any(k in s for k in ["禁止逆向", "加混淆", "技术对抗", "商业软件的完整功能", "别碰", "授权的目标"])), None)
+        if compliance_sent:
+            pitfalls.append(f"【合规红线】严禁技术对抗：{compliance_sent}")
+        else:
+            pitfalls.append("【合规红线】严格限定合法学习或授权复刻，严禁对明确禁止逆向或商业加密混淆做对抗。")
 
-        if not pitfalls:
-            pitfalls.append("依赖外部环境版本一致性，版本漂移可能导致调用失败")
-            pitfalls.append("对于超大规模复杂项目，AI 一次性分析可能出现幻觉或切分过粗")
-        return pitfalls[:5]
+        # 2. 环境与依赖配置坑
+        env_sent = next((s for s in sents if any(k in s for k in ["Node 版本不对", "command not found", "MCP 没挂上", "Docker 起不来", "缺什么工具就装"])), None)
+        if env_sent:
+            pitfalls.append(f"【环境排错】多工具链依赖配置：{env_sent}")
+        else:
+            pitfalls.append("【环境排错】涉及多工具串联，遇到报错应保留完整日志并逐项单点排查，切忌全量同时修改。")
+
+        # 3. 目标范围与代码复刻方式
+        scope_sent = next((s for s in sents if any(k in s for k in ["搬代码", "搬素材", "做一模一样的东西", "原样搬", "理解思路后重写，不是复制原代码", "行为弄明白"])), None)
+        if scope_sent:
+            pitfalls.append(f"【复刻边界】严禁机械抄袭：{scope_sent}")
+        else:
+            pitfalls.append("【复刻边界】切忌盲目原样搬运代码或素材；复刻核心在于摸清行为逻辑后独立自研重写。")
+
+        # 4. 安全检测与上线边界
+        sec_sent = next((s for s in sents if any(k in s for k in ["不能拿它当", "安全的证明", "安全测试的证明", "PentAGI 能帮忙找问题", "弱密码", "业务逻辑漏洞"])), None)
+        if sec_sent:
+            pitfalls.append(f"【安全界限】自动化检测仅为辅助：{sec_sent}")
+        else:
+            pitfalls.append("【安全界限】自动化工具仅提供初步扫描，业务逻辑漏洞与敏感权限仍需人工专项复核。")
+
+        return pitfalls[:4]
 
     def _extract_commands(self, text: str) -> List[str]:
-        # 提取 bash/cmd 命令块
         cmds = []
         code_blocks = re.findall(r'```(?:bash|shell|sh)?\n(.*?)\n```', text, re.DOTALL)
         for block in code_blocks:
             lines = [l.strip() for l in block.splitlines() if l.strip() and not l.startswith('#')]
             for l in lines:
                 if any(l.startswith(k) for k in ["npm ", "npx ", "docker ", "pip ", "git ", "rea ", "codex ", "claude "]):
-                    cmds.append(l)
+                    if l not in cmds:
+                        cmds.append(l)
         return cmds[:4]
 
     def _extract_key_insights(self, text: str) -> List[str]:
         insights = []
-        patterns = [
-            r'整件事分成([^\n]{10,60})',
-            r'四段走完([^\n]{6,40})',
-            r'复刻\s*≠\s*抄袭[^\n]{0,40}',
-            r'按顺序走一遍[^\n]{6,40}'
-        ]
-        for pat in patterns:
-            m = re.search(pat, text)
-            if m:
-                insights.append(m.group(0).strip())
-
-        if not insights:
-            lines = [l.strip() for l in text.splitlines() if len(l.strip()) > 20 and not l.startswith(('#', '!', '>'))]
-            for l in lines[:3]:
-                if any(k in l for k in ["核心", "原则", "流程", "建议", "注意"]):
-                    insights.append(l[:60])
+        sents = self._split_into_valid_sentences(text)
+        for s in sents:
+            if any(k in s for k in ["四段走完", "整件事分成", "复刻不是抄对方的代码", "先建一个目录", "一次只处理一个问题"]):
+                if s not in insights:
+                    insights.append(s)
         return insights[:3]

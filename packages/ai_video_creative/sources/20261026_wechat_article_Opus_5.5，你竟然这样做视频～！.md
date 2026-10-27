@@ -29,13 +29,13 @@ Claude Opus 5.5是强，我看到很多代码炫酷耍帅的视频。
 
 ## 一、五个方向，我选了维米尔
 
-![配图](https://mmbiz.qpic.cn/mmbiz_jpg/7sJ3tx6734XlQWsyiaicTeuJhbkvnvbC3iauo9s7LfOuy5lgvQTJKQMJARHp6ft3q5PctfCBtBNqmGZ4RtqIyGsxuGxNaH7AP7rNCPibicntt9x4/640?from=appmsg)
+![配图](assets/img_20261026_wechat_article_Opus_5_01.png)
 Claude 给了我五个方向的概念图：
 看到第五张的时候就定了：那束全凭感觉。于是opus给我基于维米尔给了我三个剧本方向。
 
 ## 二、剧本：从三个短故事，到一个立意
 
-![配图](https://mmbiz.qpic.cn/sz_mmbiz_jpg/7sJ3tx6734WTz5mg3oCDyBVRv7XNWb1ticGDdHayCJY80pY9lmC4zNiaZ64u5vaLJICUvYBsqup1ULJwtLr95rlOoB4yPqUY5wdTjzg7Gmcrk/640?from=appmsg)
+![配图](assets/img_20261026_wechat_article_Opus_5_02.png)
 Claude 先写了三个短剧本，每个配了三张分镜：
 三个都挺有意思，但击中我的一句话是：
 「每个时代，都会造一台看世界的机器」
@@ -52,33 +52,33 @@ Claude 先写了三个短剧本，每个配了三张分镜：
 
 ## 三、画：同一个房间，四百年
 
-![配图](https://mmbiz.qpic.cn/mmbiz_jpg/7sJ3tx6734W3ojphsRMPIKKfdNwnRKTktjdVXP4j5qnnH5uWzVVkaiaicEb7uDhib8xGgyodtmQFias5NBU4ibNoJOo1CtWDY2DfsYvMKAibxtFics/640?from=appmsg)
+![配图](assets/img_20261026_wechat_article_Opus_5_03.png)
 所有画面都是 AI 画的油画。最关键的一招是：先生成一张 1660 年的房间当「母版」，后面每个年代都拿它当参考来画（维米尔画风）。
 所以窗、墙、桌子始终在同一个位置，只有桌上的机器和墙上的影像在变：
 叠化起来，就像同一个房间的延时摄影。
 
-![配图](https://mmbiz.qpic.cn/mmbiz_jpg/7sJ3tx6734UQLuRkfnHTH21icGjcFR8VySSuyhcwZicKo7XPCmiaRWqByRyjuFLtTVFH6NNGddAwsT5noWbYPwMibqR1F29RgPZsPYrV68TuFBk/640?from=appmsg)
+![配图](assets/img_20261026_wechat_article_Opus_5_04.png)
 
 ## 四、「图片太死了，太像 PPT」
 第一个小样出来，我的反馈很直接：
 图片太死了都完全不动，看起来有点太像 PPT 了，不高级。
 一开始 Claude 用代码给画加了「深度」：算出画里每个东西离镜头多远，镜头一动，近的走得快、远的走得慢，平面的画就有了立体感。
 
-![配图](https://mmbiz.qpic.cn/sz_mmbiz_jpg/7sJ3tx6734WrMq8uQ7DH79pIczF9nSfKokYogLOdMoprUg4utjHibwDuEZBibOnf6TrJaLmzNu94pffj3jS9L6x8icgicqagU1RvmEdZpCNiaoEA/640?from=appmsg)
+![配图](assets/img_20261026_wechat_article_Opus_5_05.png)
 （白色是近处，黑色是远处）
 但这还不够。真正让画「活」起来的，是眨眼。
 我让它试试用 Seedance 把眼睛那张画做成视频，让眼睛眨一下。出来的那一刻我就觉得对了：「眨眼就很生动」。
 
-![配图](https://mmbiz.qpic.cn/sz_mmbiz_jpg/7sJ3tx6734UOKQicO5ic9NpAtpdPPjByC51fDGf7gut9EP7YfoUQT638fHprXiaibM8AeLibzvZuuKX5WryeuwMbeJFGRviaOvu8pXdUlBNd62KU4/640?from=appmsg)
+![配图](assets/img_20261026_wechat_article_Opus_5_06.png)
 于是后面的每个镜头都这么做：把油画交给 AI 视频模型，让火苗真的跳起来，让墙上的倒影真的走过去，让运河的水真的在闪。
 
-![配图](https://mmbiz.qpic.cn/mmbiz_jpg/7sJ3tx6734Xx0ibZ4zWBxiaCB8739cYB1HHtpoXOAtm5enkMPCV610yZeA7AnkMibEb21uNPTauzTHWmiccb7ttKGRicV1vMNv06CDQ8KIwBycXk/640?from=appmsg)
+![配图](assets/img_20261026_wechat_article_Opus_5_07.png)
 
-![配图](https://mmbiz.qpic.cn/mmbiz_jpg/7sJ3tx6734WlU78MTZMyl1LHTGzMH9re057I8Yppart6poibFgrsouhSPHt7Jq7KLZDsPvFiakxk2WGamO3SdiaOEfiajiaSptZQUrn7Ud2kCNgI/640?from=appmsg)
+![配图](assets/img_20261026_wechat_article_Opus_5_08.png)
 （上：交给 AI 的油画；下：AI 生成的第 6 秒，火腾起来了，人举起了手）
 这里有个细节：AI 视频总会偷偷推近一点、平移一点。Claude 就把每一帧都「钉」回原来那张画的位置——打个比方，就像投影仪有点晃，它把每一帧都对准回画框。这样后面叠上去的金线、字幕、说明牌，位置永远是准的。
 
-![配图](https://mmbiz.qpic.cn/sz_mmbiz_jpg/7sJ3tx6734WTfVAYJfxMKtAuYFvFHBX5NWB5ic4ZAdMoWxHUh396lL3C1o61icX3un09y0YHQo5JcYibjYeLD4GPvm6fmnSt8EhLmg3BvWiaMRw/640?from=appmsg)
+![配图](assets/img_20261026_wechat_article_Opus_5_09.png)
 
 ## 五、声音：我听了很多遍
 旁白。我挑了一个沙哑、有分量的纪录片声线。一开始直接用 AI 生成，结果它时不时乱来：有一次把语气提示也念了出来，还有一次自己编了一段北欧神话。后来改成用我 Windows 电脑上的本地模型，克隆这个声线，一句一句生成，每句都让 AI 听写回来逐词核对。
@@ -88,27 +88,27 @@ Claude 先写了三个短剧本，每个配了三张分镜：
 ## 六、最难的一段：Omia 怎么出场
 片子的最后，要从「人类看见了这么多」落到 Omia。这一段改了很多次。
 
-![配图](https://mmbiz.qpic.cn/mmbiz_jpg/7sJ3tx6734Vw2iaalBpx9NaqAR3lk5KXhBiaqS2aicvRFibClaowXxwjicrJ5PaibNaLy0rgX3JMteYFFC7OZSoibClA3eWFmf6w6iaCyYibvmcqM9A8/640?from=appmsg)
+![配图](assets/img_20261026_wechat_article_Opus_5_10.png)
 第一次，墙上投出了真的 Omia 软件界面，旁边还站着一个 AI 生成的小孩。我看完的反应是：
 这里出现 Omia 真实的东西，就全片垮掉的感觉。 这个小孩看起来也有点可怕。
 我想要的是：
 这个部分还是应该比较意向的表达。代码啊，3 维啊，音乐啊，数学啊，动画啊，各种什么的都被 Omia 收纳在一个框里，规整的呈现。不能截图，不能弄真 Omia 的感觉，logo 可以特效展示。
 就是前面讲了人看了这么多东西，最后现在是各种东西都在墙上，但是有个 Omia 可以帮你清爽的收纳着看，帮助你好好看、学习掌握的这么个意思。
 
-![配图](https://mmbiz.qpic.cn/mmbiz_jpg/7sJ3tx6734VI1Sk2zKqKhHhqK7fkArncuQKyrTDuC0VZ2JtauAiaUsEfbqrYdKnFtZKtNDAFr3ZbJRcGZHLAnG21zIxjv7iaGYYrfM5JvMB3U/640?from=appmsg)
+![配图](assets/img_20261026_wechat_article_Opus_5_11.png)
 第二次，文件收进了框里，但太少了，只占了一半。我说要「很多很多很多文件，各种的」。
 第三次就是现在的样子：
 
-![配图](https://mmbiz.qpic.cn/sz_mmbiz_jpg/7sJ3tx6734UFqWVsMa3qheiax3zia53ZvKGmOicIjRriar1wdK94qDwFeWZx2mTNtIlxNMv6EUGwa8sV27jnPXFuibTkDdibGhGdbqdtricpzWXZib8/640?from=appmsg)
+![配图](assets/img_20261026_wechat_article_Opus_5_12.png)
 
 ## 七、最后一个画面
 
-![配图](https://mmbiz.qpic.cn/sz_mmbiz_jpg/7sJ3tx6734UbsIoNaG8QzWMZ5kCUXSQOAiaaicbFedEnkKrA1eb6QjUjTchlV8FQrBTO2Nsry4r8O7yRoj3lSvibgejRADf3CBoN0MIHSf6jb4/640?from=appmsg)
+![配图](assets/img_20261026_wechat_article_Opus_5_13.png)
 落版是那枚黄铜光圈。AI 生成的视频里，光圈叶片变形了，「多一坨」；改回油画静帧后又太静，我要光有点动效；加了一圈放射的光芒，我又觉得不对：
 就是一些光照灰尘漂浮，可能更优雅点。
 现在就是：光在光圈里一呼一吸，细小的灰尘在光里漂。
 
-![配图](https://mmbiz.qpic.cn/mmbiz_jpg/7sJ3tx6734WdwmMiaY72OsXGzlS13onQF8m7t8tcXZtDVzlYBEsOfYm4ECGljqyqtia0ZAF5buTUOEWtNbklDXgTpqYV6htHgcwj7ic1QYibpPo/640?from=appmsg)
+![配图](assets/img_20261026_wechat_article_Opus_5_14.png)
 
 ## 八、倒带：这部片子的技术框架
 用倒带学习法把整个过程倒回去看，技术上其实就三层：

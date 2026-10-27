@@ -124,24 +124,37 @@ class WeChatArticleCrawler(BaseCrawler):
                     src = elem.get("data-src") or elem.get("src")
                     if src and src.startswith("http"):
                         alt = elem.get("alt") or f"插图_{img_counter+1}"
-                        # 离线下载前 8 张核心配图
+                        # 离线下载文章所有配图 (附带微信防盗链 Referer 请求头)
                         local_img_name = ""
-                        if img_counter < 8:
+                        if img_counter < 60:
                             try:
                                 img_counter += 1
-                                safe_slug = re.sub(r'[^a-zA-Z0-9]', '_', title)[:20]
-                                local_filename = f"wechat_{safe_slug}_{img_counter:02d}.png"
+                                safe_slug = re.sub(r'[^a-zA-Z0-9]', '_', title)[:20].strip('_')
+                                ext = "png"
+                                if "wx_fmt=jpeg" in src or "wx_fmt=jpg" in src:
+                                    ext = "jpg"
+                                elif "wx_fmt=gif" in src:
+                                    ext = "gif"
+                                local_filename = f"wechat_{safe_slug}_{img_counter:02d}.{ext}"
                                 local_img_path = dest_assets_dir / local_filename
                                 if not local_img_path.exists():
-                                    with httpx.Client(headers=headers, timeout=8.0) as img_client:
+                                    img_headers = {
+                                        "User-Agent": DEFAULT_USER_AGENT,
+                                        "Referer": "https://mp.weixin.qq.com/",
+                                        "Accept": "image/avif,image/webp,image/apng,image/*,*/*;q=0.8"
+                                    }
+                                    with httpx.Client(headers=img_headers, timeout=12.0) as img_client:
                                         r_img = img_client.get(src)
                                         if r_img.status_code == 200 and len(r_img.content) > 1000:
                                             with open(local_img_path, "wb") as f_img:
                                                 f_img.write(r_img.content)
                                             local_img_name = local_filename
                                             images.append(str(local_img_path))
-                            except Exception:
-                                pass
+                                else:
+                                    local_img_name = local_filename
+                                    images.append(str(local_img_path))
+                            except Exception as e:
+                                logger.warning(f"Failed to fetch image offline: {e}")
 
                         if local_img_name:
                             markdown_lines.append(f"\n![{alt}](assets/{local_img_name})\n")
