@@ -6,15 +6,25 @@ domain_name: 通用知识与综合收藏
 domain_icon: 📥
 tags:
 - AI
+- 草稿鸭
 - 通用知识
 - 微信公众号
 - EARS
 - AI开源无界
 - 待归档
 created_at: '2026-10-26 20:53:07'
-updated_at: '2026-10-26 20:53:34'
-item_count: 2
+updated_at: '2026-10-26 20:53:56'
+item_count: 3
 sources:
+- id: wechat_article_20261026_REA_+_Reverse-skill_+_PentAGI复刻任何软件
+  title: REA + Reverse-skill + PentAGI复刻任何软件
+  type: wechat_article
+  url: https://mp.weixin.qq.com/s/dK_p1fHAQA3u-zbn5er7ZA
+  author: 草稿鸭
+  file: sources/20261026_wechat_article_REA_+_Reverse-skill_+_PentAGI复刻任何软件.md
+  ingested_at: '2026-10-26 20:53:56'
+  keyframes_count: 0
+  snippets_count: 0
 - id: wechat_article_20261026_我把_3_个_Star_过万的_Skill_串起来，搭了一条能“复刻任意软件”的流水线
   title: 我把 3 个 Star 过万的 Skill 串起来，搭了一条能“复刻任意软件”的流水线
   type: wechat_article
