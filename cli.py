@@ -38,17 +38,19 @@ dispatcher = CrawlerDispatcher()
 def ingest_cmd(
     target: str = typer.Argument(..., help="待采集目标：微信公众号URL、视频号分享文本/链接、B站视频URL、通用网页URL或本地图片路径"),
     package: Optional[str] = typer.Option(None, "--package", "-p", help="指定归属的知识资产包ID (如未指定将自动智能聚类)"),
-    domain: Optional[str] = typer.Option(None, "--domain", "-d", help="指定一级领域分类 (如: 商业, AI科技, 建筑, 3D视觉, 产品, 全栈工程)")
+    domain: Optional[str] = typer.Option(None, "--domain", "-d", help="指定一级领域分类 (如: 商业, AI科技, 建筑, 3D视觉, 产品, 全栈工程)"),
+    sub: Optional[str] = typer.Option(None, "--sub", "-s", help="指定二级子方向 (如: ai_reverse, ai_video, saas_growth 等)")
 ):
     """
     📥 极速采集并归档至知识资产包
     """
-    domain_label = f" (偏好领域: [bold yellow]{domain}[/bold yellow])" if domain else ""
-    console.print(f"[bold cyan]🔍 正在解析输入目标:[/bold cyan] {target}{domain_label}")
+    domain_label = f" (领域: [bold yellow]{domain}[/bold yellow])" if domain else ""
+    sub_label = f" (子方向: [bold yellow]{sub}[/bold yellow])" if sub else ""
+    console.print(f"[bold cyan]🔍 正在解析输入目标:[/bold cyan] {target}{domain_label}{sub_label}")
     with console.status("[bold green]正在抓取数据、清洗正文并提取关键帧与代码片段...", spinner="dots"):
         try:
             item = dispatcher.dispatch(target)
-            pkg_id, source_path = pm.ingest_item(item, preferred_package=package, preferred_domain=domain)
+            pkg_id, source_path = pm.ingest_item(item, preferred_package=package, preferred_domain=domain, preferred_sub_category=sub)
             
             # Git 自动跟踪与版本提交
             commit_msg = f"feat(kb): ingest [{item.source_type}] {item.title[:40]} into '{pkg_id}'"
@@ -61,12 +63,13 @@ def ingest_cmd(
     pkg_meta = pm.get_package(pkg_id) or {}
     dom_name = pkg_meta.get("domain_name") or pkg_meta.get("domain") or "未分类"
     dom_icon = pkg_meta.get("domain_icon") or "📁"
+    sub_name = pkg_meta.get("sub_category_name") or pkg_meta.get("sub_category") or "默认子方向"
 
     # 成果报告卡片
     summary_text = f"""
 **标题**: {item.title}
 **数据类型**: `{item.source_type}` | **作者**: {item.author or '未知'}
-**一级领域**: {dom_icon} **{dom_name}**
+**知识层级**: {dom_icon} **{dom_name}** > **{sub_name}**
 **归属资产包**: `[bold green]{pkg_id}[/bold green]` ({pkg_meta.get('name')})
 **提取成果**:
 - 关键帧截图: [bold yellow]{len(item.keyframes)}[/bold yellow] 张 (零原视频存储)
@@ -77,51 +80,41 @@ def ingest_cmd(
     console.print(Panel(Markdown(summary_text.strip()), title="🎉 知识资产沉淀成功", border_style="green", box=box.ROUNDED))
     console.print(f"[dim]提示: 可运行 [bold cyan]hermes-kb export {pkg_id} --target cursor --copy[/bold cyan] 一键向 Cursor 派发！[/dim]")
 
-@app.command("ingest-clip")
-def ingest_clip_cmd(
-    package: Optional[str] = typer.Option(None, "--package", "-p", help="指定归属的知识资产包ID"),
-    domain: Optional[str] = typer.Option(None, "--domain", "-d", help="指定一级领域分类 (如: 商业, AI科技, 建筑, 3D视觉, 产品, 全栈工程)")
+@app.command("delete")
+def delete_cmd(
+    package_id: str = typer.Argument(..., help="待清理删除的资产包 ID"),
+    source: Optional[str] = typer.Option(None, "--source", "-s", help="如仅删除单篇文章，指定文件名"),
+    yes: bool = typer.Option(False, "--yes", "-y", help="跳过确认直接删除")
 ):
     """
-    📋 从系统剪贴板读取 URL 或文本直接一键录入 (Mac 上刷微信/B站时 Cmd+C 后一键录入)
+    🗑️ 清理与删除资产包或单篇资料 (彻底清除一切污染或废弃数据)
     """
-    clip_text = exporter.read_from_clipboard()
-    if not clip_text:
-        console.print("[bold yellow]⚠️ 当前剪贴板为空，请先复制微信公众号文章链接、B站链接或网页地址。[/bold yellow]")
-        return
-    console.print(f"[bold cyan]📋 识别到剪贴板内容:[/bold cyan] {clip_text[:80]}...")
-    ingest_cmd(clip_text, package, domain)
-
-@app.command("domains")
-def domains_cmd():
-    """
-    🌐 查看系统的一级知识领域分类体系 (商业/AI科技/建筑设计/三维等)
-    """
-    table = Table(title="🌐 Hermes 一级知识领域分类体系 (Domain Taxonomy)", box=box.ROUNDED)
-    table.add_column("图标", justify="center")
-    table.add_column("领域标识 (ID)", style="cyan", no_wrap=True)
-    table.add_column("一级领域名称", style="bold white")
-    table.add_column("默认知识资产包", style="magenta")
-    table.add_column("常见别名/触发词", style="yellow")
-
-    for dom_id, info in PRIMARY_DOMAINS.items():
-        table.add_row(
-            info.get("icon", "📁"),
-            dom_id,
-            info.get("name"),
-            info.get("default_package"),
-            ", ".join(info.get("aliases", [])[:5])
-        )
-
-    console.print(table)
-    console.print("[dim]提示: 采集时可通过 [bold cyan]-d 商业[/bold cyan] 或 [bold cyan]-d 建筑[/bold cyan] 等别名直接指定领域！[/dim]")
+    if source:
+        ok = pm.delete_source(package_id, source)
+        if ok:
+            git_mgr.commit(f"feat(kb): delete source '{source}' from '{package_id}'")
+            console.print(f"[bold green]✅ 已成功从资产包 [{package_id}] 中彻底移除资料: {source}[/bold green]")
+        else:
+            console.print(f"[bold red]❌ 未找到资料文件: {source}[/bold red]")
+    else:
+        if not yes:
+            confirm = typer.confirm(f"⚠️ 确定彻底删除资产包 [{package_id}] 及其所有本地脱机存档文件吗？")
+            if not confirm:
+                console.print("[dim]操作已取消。[/dim]")
+                return
+        ok = pm.delete_package(package_id)
+        if ok:
+            git_mgr.commit(f"feat(kb): delete package '{package_id}'")
+            console.print(f"[bold green]✅ 已彻底删除资产包 [{package_id}]！[/bold green]")
+        else:
+            console.print(f"[bold red]❌ 未找到资产包: {package_id}[/bold red]")
 
 @app.command("list")
 def list_cmd(
-    domain: Optional[str] = typer.Option(None, "--domain", "-d", help="按领域筛选 (如: business, ai_tech, architecture)")
+    domain: Optional[str] = typer.Option(None, "--domain", "-d", help="按领域筛选 (如: ai_tech, business, architecture)")
 ):
     """
-    📚 查看知识资产包清单 (可按领域筛选)
+    📚 查看知识资产包清单 (清晰展示 一级领域 > 二级子方向 > 资产包)
     """
     packages = pm.list_packages()
     if domain:
@@ -129,26 +122,29 @@ def list_cmd(
         packages = [p for p in packages if p.get("domain") == dom_key or p.get("domain_name") == domain]
 
     if not packages:
-        console.print("[yellow]当前暂无匹配的知识资产包。使用 [bold cyan]hermes-kb ingest <url>[/bold cyan] 开始构建！[/yellow]")
+        console.print("[yellow]当前资产库为空或无匹配项。使用 [bold cyan]hermes-kb ingest <url>[/bold cyan] 开始构建！[/yellow]")
         return
 
-    table = Table(title="🗂️ Hermes 知识资产包全景 (Knowledge Asset Packages)", box=box.ROUNDED)
+    table = Table(title="🗂️ Hermes 多级知识资产库全景 (Knowledge Hierarchy)", box=box.ROUNDED)
     table.add_column("一级领域", style="magenta")
+    table.add_column("二级子方向", style="blue")
     table.add_column("资产包 ID", style="cyan", no_wrap=True)
-    table.add_column("名称", style="bold white")
+    table.add_column("资产包名称", style="bold white")
+    table.add_column("实体数", justify="right", style="yellow")
     table.add_column("收录篇数", justify="right", style="green")
-    table.add_column("核心标签", style="yellow")
     table.add_column("最后更新", style="dim")
 
     for p in packages:
-        tags_str = ", ".join(p.get("tags", [])[:4])
         dom_display = f"{p.get('domain_icon', '📁')} {p.get('domain_name') or p.get('domain', '通用')}"
+        sub_display = f"{p.get('sub_category_icon', '📌')} {p.get('sub_category_name') or p.get('sub_category', '默认')}"
+        matrix_count = len(p.get("knowledge_matrix", []))
         table.add_row(
             dom_display,
+            sub_display,
             p.get("id"),
             p.get("name"),
+            str(matrix_count),
             str(p.get("item_count", 0)),
-            tags_str,
             p.get("updated_at", "")[:16]
         )
 

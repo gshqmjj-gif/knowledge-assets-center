@@ -1,5 +1,6 @@
 """
 Hermes Knowledge Base Configuration (配置中心)
+多级知识层级体系 (一级领域 > 二级子方向/专题 > 三级资产包)
 """
 import os
 import shutil
@@ -33,94 +34,141 @@ FFPROBE_BIN = find_binary("ffprobe", ["/opt/homebrew/bin/ffprobe", "/usr/local/b
 GIT_AUTO_COMMIT = True
 GIT_DEFAULT_AUTHOR = "HermesKB Agent <hermes@local>"
 
-# 一级领域知识分类体系 (Top-Level Domains)
+# 多级领域知识分类体系 (一级领域 > 二级子方向/专题)
 PRIMARY_DOMAINS = {
-    "business": {
-        "name": "商业与商业模式",
-        "icon": "💼",
-        "aliases": ["商业", "商业模式", "商学", "变现", "运营", "营销", "投资", "出海", "business", "biz"],
-        "keywords": [
-            "商业模式", "商业", "变现", "运营", "营销", "投融资", "战略", "流量", "增长",
-            "出海", "创业", "定价", "市场", "电商", "财报", "SaaS", "估值", "商业化",
-            "business", "monetization", "marketing", "startup", "strategy", "roi", "b2b", "b2c"
-        ],
-        "default_package": "business_and_strategy",
-        "default_package_name": "商业模式与战略运营"
-    },
     "ai_tech": {
         "name": "AI科技与大模型",
         "icon": "🤖",
         "aliases": ["AI", "ai", "AI科技", "人工智能", "大模型", "智能体", "agent", "llm"],
-        "keywords": [
-            "agent", "llm", "langchain", "prompt", "rag", "mcp", "cursor", "codex", "claude",
-            "gpt", "fine-tune", "智能体", "大模型", "工作流", "知识库", "提示词", "深度学习",
-            "神经网络", "aigc", "transformer", "embedding", "openai", "anthropic"
-        ],
-        "default_package": "ai_tech_and_agents",
-        "default_package_name": "AI前沿科技与智能体工程"
+        "sub_categories": {
+            "ai_reverse": {
+                "name": "逆向工程与代码复刻",
+                "icon": "⚡",
+                "keywords": ["逆向", "复刻", "reverse", "decompil", "rea", "pentagi", "ghidra", "ida", "反编译", "软件复刻"]
+            },
+            "ai_video": {
+                "name": "AI视频与多模态创作",
+                "icon": "🎬",
+                "keywords": ["视频", "video", "opus", "runway", "sora", "cogvideo", "分镜", "关键帧", "剪辑", "视觉生成"]
+            },
+            "ai_agents": {
+                "name": "智能体与工作流自动化",
+                "icon": "🤖",
+                "keywords": ["agent", "智能体", "mcp", "工作流", "langchain", "autogen", "crewai", "prompt", "提示词"]
+            },
+            "local_llm": {
+                "name": "本地大模型与知识库RAG",
+                "icon": "🧠",
+                "keywords": ["本地", "ollama", "rag", "知识库", "微调", "vllm", "llama", "私有化", "embedding", "向量检索"]
+            }
+        }
+    },
+    "business": {
+        "name": "商业与商业模式",
+        "icon": "💼",
+        "aliases": ["商业", "商业模式", "商学", "变现", "运营", "营销", "投资", "出海", "business", "biz"],
+        "sub_categories": {
+            "monetization": {
+                "name": "出海与独立开发变现",
+                "icon": "🌍",
+                "keywords": ["出海", "变现", "独立开发", "海外", "stripe", "global", "跨境", "副业", "产品出海"]
+            },
+            "saas_growth": {
+                "name": "SaaS定价与增长策略",
+                "icon": "📈",
+                "keywords": ["saas", "定价", "增长", "获客", "留存", "plg", "mrr", "arr", "席位计费", "roi"]
+            },
+            "biz_breakdown": {
+                "name": "商业模式与案例拆解",
+                "icon": "🛒",
+                "keywords": ["商业模式", "电商", "变现案例", "财报", "拆解", "盈利模式", "商业逻辑", "竞争壁垒"]
+            }
+        }
     },
     "architecture": {
         "name": "建筑设计与空间计算",
         "icon": "🏛️",
         "aliases": ["建筑", "空间", "室内", "空间计算", "bim", "architecture", "arch"],
-        "keywords": [
-            "建筑设计", "建筑", "规划", "室内设计", "空间", "结构", "参数化", "草图", "rhino",
-            "grasshopper", "bim", "revit", "建筑学", "户型", "空间计算", "景观设计",
-            "architecture", "parametric", "spatial", "urban design", "facade", "cad"
-        ],
-        "default_package": "architecture_and_spatial",
-        "default_package_name": "建筑设计与空间计算"
+        "sub_categories": {
+            "parametric_design": {
+                "name": "参数化算法与立面推演",
+                "icon": "📐",
+                "keywords": ["参数化", "grasshopper", "rhino", "幕墙", "立面", "几何算法", "python for rhino"]
+            },
+            "bim_automation": {
+                "name": "BIM自动化与施工流转",
+                "icon": "🏗️",
+                "keywords": ["bim", "revit", "施工图", "构件", "装配式", "空间计算", "结构力学", "深化设计"]
+            },
+            "spatial_planning": {
+                "name": "空间规划与户型计算",
+                "icon": "🌐",
+                "keywords": ["户型", "空间规划", "城市设计", "动线", "建筑学", "平面布局", "空间矩阵"]
+            }
+        }
     },
-    "3d_and_visual": {
+    "3d_visual": {
         "name": "三维与数字艺术",
         "icon": "🎨",
         "aliases": ["3D", "3d", "三维", "建模", "渲染", "blender", "视觉", "cg"],
-        "keywords": [
-            "blender", "threejs", "3d", "gaussian splatting", "3dgs", "nerf", "geometry",
-            "mesh", "shader", "houdini", "建模", "渲染", "雕刻", "拓扑", "材质", "灯光",
-            "虚幻引擎", "ue5", "unity", "数字人", "vfx", "视效", "动效"
-        ],
-        "default_package": "3d_and_digital_art",
-        "default_package_name": "三维建模与数字视觉艺术"
+        "sub_categories": {
+            "blender_pipeline": {
+                "name": "Blender建模与节点工作流",
+                "icon": "🎨",
+                "keywords": ["blender", "几何节点", "材质", "拓扑", "着色器", "shader", "雕刻", "布线"]
+            },
+            "gaussian_splatting": {
+                "name": "3D高斯泼溅与实景重建",
+                "icon": "⚡",
+                "keywords": ["3dgs", "gaussian splatting", "nerf", "实景重建", "点云", "摄影测量", "trellis"]
+            },
+            "virtual_production": {
+                "name": "虚幻引擎与数字制片",
+                "icon": "🎮",
+                "keywords": ["ue5", "虚幻引擎", "数字人", "场景", "虚拟制片", "vfx", "电影级渲染"]
+            }
+        }
     },
-    "product_and_design": {
-        "name": "产品设计与用户体验",
-        "icon": "💡",
-        "aliases": ["产品", "设计", "体验", "交互", "ui", "ux", "product"],
-        "keywords": [
-            "产品经理", "产品设计", "ui", "ux", "交互设计", "用户体验", "需求分析", "流程图",
-            "线框图", "原型", "figma", "设计系统", "体验设计", "增长黑客", "用户研究",
-            "product management", "design system", "wireframe", "prototype"
-        ],
-        "default_package": "product_and_ux_design",
-        "default_package_name": "产品逻辑与交互设计"
-    },
-    "engineering_and_dev": {
+    "engineering": {
         "name": "全栈工程与系统研发",
         "icon": "⚙️",
         "aliases": ["技术", "工程", "开发", "代码", "全栈", "后端", "前端", "爬虫", "code", "dev"],
-        "keywords": [
-            "python", "react", "vue", "nextjs", "css", "tailwind", "typescript", "fastapi",
-            "docker", "k8s", "redis", "database", "postgres", "microservice", "爬虫", "逆向",
-            "抓包", "自动化", "selenium", "playwright", "后端", "微服务", "架构", "并发"
-        ],
-        "default_package": "fullstack_engineering",
-        "default_package_name": "全栈开发与系统工程"
+        "sub_categories": {
+            "crawler_spider": {
+                "name": "现代爬虫与自动化抓包",
+                "icon": "🕷️",
+                "keywords": ["爬虫", "逆向抓包", "playwright", "selenium", "自动化", "anti-bot", "charles", "frida"]
+            },
+            "backend_arch": {
+                "name": "高并发系统与微服务架构",
+                "icon": "⚡",
+                "keywords": ["后端", "fastapi", "docker", "k8s", "redis", "postgres", "微服务", "消息队列", "并发"]
+            },
+            "frontend_ui": {
+                "name": "前端交互与现代组件工程",
+                "icon": "💻",
+                "keywords": ["react", "vue", "nextjs", "tailwind", "typescript", "threejs", "canvas", "webgpu"]
+            }
+        }
     },
-    "general_inbox": {
-        "name": "通用知识与综合收藏",
+    "inbox": {
+        "name": "待整理临时收件箱",
         "icon": "📥",
         "aliases": ["通用", "综合", "其他", "收藏", "inbox", "general"],
-        "keywords": ["知识", "通用", "灵感", "随笔", "读书笔记", "方法论"],
-        "default_package": "general_knowledge_inbox",
-        "default_package_name": "通用技术与灵感收藏箱"
+        "sub_categories": {
+            "quick_capture": {
+                "name": "临时快速收集",
+                "icon": "📌",
+                "keywords": ["临时", "速记", "待归档", "inbox"]
+            }
+        }
     }
 }
 
 def resolve_domain(input_domain_or_alias: str) -> str:
-    """根据别名或模糊输入匹配标准领域 ID"""
+    """根据别名或模糊输入匹配标准一级领域 ID"""
     if not input_domain_or_alias:
-        return "general_inbox"
+        return "inbox"
     s = input_domain_or_alias.strip().lower()
     for dom_id, info in PRIMARY_DOMAINS.items():
         if s == dom_id.lower() or s == info["name"].lower():
@@ -128,10 +176,35 @@ def resolve_domain(input_domain_or_alias: str) -> str:
         for alias in info.get("aliases", []):
             if s == alias.lower() or alias.lower() in s:
                 return dom_id
-    return "general_inbox"
+    return "inbox"
 
-# 兼容旧字段
-DEFAULT_DOMAINS = PRIMARY_DOMAINS
+def resolve_sub_category(domain_key: str, text_blob: str) -> tuple[str, str]:
+    """根据内容关键词在指定领域下自动路由二级子方向"""
+    dom_info = PRIMARY_DOMAINS.get(domain_key)
+    if not dom_info:
+        dom_info = PRIMARY_DOMAINS["inbox"]
+        domain_key = "inbox"
+
+    sub_cats = dom_info.get("sub_categories", {})
+    if not sub_cats:
+        return "default", "默认子分类"
+
+    blob_lower = text_blob.lower()
+    best_sub = None
+    best_matches = 0
+
+    for sub_id, sub_info in sub_cats.items():
+        matches = sum(1 for kw in sub_info.get("keywords", []) if kw.lower() in blob_lower)
+        if matches > best_matches:
+            best_matches = matches
+            best_sub = (sub_id, sub_info.get("name", sub_id))
+
+    if best_sub and best_matches > 0:
+        return best_sub
+
+    # 默认选该领域的第一个子方向
+    first_key = list(sub_cats.keys())[0]
+    return first_key, sub_cats[first_key]["name"]
 
 # 视频整理设置 (严格规范：不存原视频，提取关键帧截屏与核心详解)
 VIDEO_SETTINGS = {

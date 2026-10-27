@@ -1,0 +1,47 @@
+id: ai_video_creative
+name: Opus与AI视频创意工作流
+description: Claude Opus 5.5 与多模态创意视频制作实战工作流
+domain: ai_tech
+domain_name: AI科技与大模型
+domain_icon: 🤖
+tags:
+- AI视频
+- Opus 5.5
+- 多模态
+- 创意工作流
+created_at: '2026-10-26 22:50:20'
+updated_at: '2026-10-26 22:50:20'
+item_count: 1
+sources:
+- id: wechat_article_20261026_Opus_5.5，你竟然这样做视频～！
+  title: Opus 5.5，你竟然这样做视频～！
+  type: wechat_article
+  url: https://mp.weixin.qq.com/s/jZwxMX9nWsD0abzrPWe0Ig
+  author: EARS
+  file: sources/20261026_wechat_article_Opus_5.5，你竟然这样做视频～！.md
+  ingested_at: '2026-10-26 20:53:07'
+  keyframes_count: 0
+  snippets_count: 0
+  associated_entity: Claude
+  incremental_merged: false
+sub_category: ai_video
+sub_category_name: AI视频与多模态创作
+knowledge_matrix:
+- entity_name: Claude
+  domain: ai_tech
+  archetype: general_tech
+  core_function: Claude Opus 5.5是强，我看到很多代码炫酷耍帅的视频。
+  hardware_specs: 标准机器配置 (4G~8G 内存即可无痛运行)
+  environment: Python 3.10+
+  local_deployable: 🟢 本地命令行/独立工具 (无强联网依赖)
+  competitive_advantages:
+  - 模块解耦度高，支持无缝嵌入现有工作流
+  - 输出带证据链追溯，结论可二次核对验证
+  limitations_and_pitfalls:
+  - 依赖外部环境版本一致性，版本漂移可能导致调用失败
+  - 对于超大规模复杂项目，AI 一次性分析可能出现幻觉或切分过粗
+  quickstart_commands: []
+  key_insights: []
+  sources_contributed:
+  - EARS
+  merged_sources_count: 1

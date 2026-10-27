@@ -1,6 +1,6 @@
 """
 Hermes Knowledge Base Web Server & API
-提供本地可视化操作台：一键采集、多渠道知识库浏览、关键帧视觉预览、一键导出给 Cursor / Codex / Hermes
+提供本地可视化操作台：多级知识分层、全局检索、一键采集、多渠道知识库浏览、关键帧视觉预览、一键导出给 Cursor / Codex / Hermes
 """
 import logging
 from pathlib import Path
@@ -42,20 +42,60 @@ class IngestRequest(BaseModel):
     url: str
     package: Optional[str] = None
     domain: Optional[str] = None
+    sub_category: Optional[str] = None
 
 class CopyRequest(BaseModel):
     text: str
+
+@app.get("/api/taxonomy")
+def get_taxonomy():
+    pkgs = pm.list_packages()
+    stats = {}
+    for p in pkgs:
+        d = p.get("domain", "inbox")
+        sub = p.get("sub_category", "default")
+        stats.setdefault(d, {}).setdefault(sub, 0)
+        stats[d][sub] += 1
+    total_sources = sum(p.get("item_count", 0) for p in pkgs)
+    return {
+        "domains": PRIMARY_DOMAINS,
+        "stats": stats,
+        "total_packages": len(pkgs),
+        "total_sources": total_sources
+    }
 
 @app.get("/api/domains")
 def list_domains():
     return {"domains": PRIMARY_DOMAINS}
 
 @app.get("/api/packages")
-def list_packages(domain: Optional[str] = None):
+def list_packages(domain: Optional[str] = None, sub: Optional[str] = None):
     pkgs = pm.list_packages()
     if domain and domain != "all":
         pkgs = [p for p in pkgs if p.get("domain") == domain]
+    if sub and sub != "all":
+        pkgs = [p for p in pkgs if p.get("sub_category") == sub]
     return {"packages": pkgs}
+
+@app.delete("/api/packages/{package_id}")
+def delete_package_api(package_id: str):
+    ok = pm.delete_package(package_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Package not found")
+    git_mgr.commit(f"feat(kb): delete package '{package_id}'")
+    return {"success": True, "message": f"Package {package_id} deleted."}
+
+@app.delete("/api/packages/{package_id}/sources")
+def delete_source_api(package_id: str, file: str):
+    ok = pm.delete_source(package_id, file)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Source not found")
+    git_mgr.commit(f"feat(kb): delete source '{file}' from '{package_id}'")
+    return {"success": True, "message": f"Source {file} deleted."}
+
+@app.get("/api/search")
+def search_api(q: str):
+    return exporter.search(q)
 
 @app.get("/api/packages/{package_id}")
 def get_package(package_id: str):
@@ -89,7 +129,12 @@ def get_package(package_id: str):
 def ingest_api(req: IngestRequest):
     try:
         item = dispatcher.dispatch(req.url)
-        pkg_id, source_path = pm.ingest_item(item, preferred_package=req.package, preferred_domain=req.domain)
+        pkg_id, source_path = pm.ingest_item(
+            item,
+            preferred_package=req.package,
+            preferred_domain=req.domain,
+            preferred_sub_category=req.sub_category
+        )
         
         # Git 自动提交
         commit_hash = git_mgr.commit(f"feat(kb): ingest [{item.source_type}] {item.title[:40]} into package '{pkg_id}'")
@@ -104,6 +149,8 @@ def ingest_api(req: IngestRequest):
             "package_name": pkg_meta.get("name"),
             "domain_name": pkg_meta.get("domain_name"),
             "domain_icon": pkg_meta.get("domain_icon"),
+            "sub_category_name": pkg_meta.get("sub_category_name"),
+            "sub_category_icon": pkg_meta.get("sub_category_icon"),
             "source_file": source_path.name,
             "keyframes_count": len(item.keyframes),
             "snippets_count": len(item.code_snippets),
@@ -173,119 +220,204 @@ HTML_DASHBOARD = r"""
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Hermes 知识资产中心 & 知识库创建助手</title>
+  <title>Hermes 知识资产中心</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
-    body { background-color: #0d1117; color: #c9d1d9; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
-    .glass-card { background: rgba(22, 27, 34, 0.85); backdrop-filter: blur(8px); border: 1px solid #30363d; }
-    .btn-gradient { background: linear-gradient(135deg, #238636 0%, #2ea043 100%); }
-    .btn-agent { background: linear-gradient(135deg, #1f6feb 0%, #388bfd 100%); }
-    .prose-clean h1 { font-size: 1.5rem; font-weight: 700; color: #ffffff; margin-top: 1.5rem; margin-bottom: 0.75rem; }
-    .prose-clean h2 { font-size: 1.25rem; font-weight: 600; color: #e6edf3; margin-top: 1.25rem; margin-bottom: 0.5rem; border-bottom: 1px solid #30363d; padding-bottom: 0.25rem; }
-    .prose-clean h3 { font-size: 1.1rem; font-weight: 600; color: #79c0ff; margin-top: 1rem; margin-bottom: 0.5rem; }
-    .prose-clean p { margin-bottom: 0.85rem; line-height: 1.65; color: #c9d1d9; }
-    .prose-clean pre { background: #161b22; padding: 1rem; border-radius: 0.75rem; border: 1px solid #30363d; overflow-x: auto; margin-bottom: 1rem; }
-    .prose-clean code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 0.85rem; }
-    .prose-clean img { max-width: 100%; height: auto; border-radius: 0.5rem; margin: 1rem 0; border: 1px solid #30363d; }
-    .prose-clean table { width: 100%; border-collapse: collapse; margin-bottom: 1rem; font-size: 0.85rem; }
-    .prose-clean th, .prose-clean td { border: 1px solid #30363d; padding: 0.5rem 0.75rem; text-align: left; }
+    body { background-color: #0b0f17; color: #c9d1d9; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
+    .glass-card { background: rgba(18, 23, 33, 0.88); backdrop-filter: blur(12px); border: 1px solid #232b38; }
+    .glass-pane { background: rgba(14, 18, 26, 0.95); border: 1px solid #232b38; }
+    .btn-gradient { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
+    .btn-agent { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); }
+    .active-nav-item { background: rgba(99, 102, 241, 0.18) !important; border-color: #6366f1 !important; color: #ffffff !important; }
+    .active-pkg-card { border-color: #6366f1 !important; background: rgba(99, 102, 241, 0.1) !important; box-shadow: 0 0 15px rgba(99, 102, 241, 0.2); }
+    .prose-clean h1 { font-size: 1.4rem; font-weight: 700; color: #ffffff; margin-top: 1.25rem; margin-bottom: 0.6rem; }
+    .prose-clean h2 { font-size: 1.2rem; font-weight: 600; color: #e6edf3; margin-top: 1.25rem; margin-bottom: 0.5rem; border-bottom: 1px solid #2d3748; padding-bottom: 0.25rem; }
+    .prose-clean h3 { font-size: 1.05rem; font-weight: 600; color: #93c5fd; margin-top: 1rem; margin-bottom: 0.4rem; }
+    .prose-clean p { margin-bottom: 0.75rem; line-height: 1.65; color: #cbd5e1; }
+    .prose-clean pre { background: #0d1117; padding: 0.85rem; border-radius: 0.5rem; border: 1px solid #30363d; overflow-x: auto; margin-bottom: 0.85rem; }
+    .prose-clean code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 0.85rem; color: #fbcfe8; }
+    .prose-clean img { max-width: 100%; height: auto; border-radius: 0.5rem; margin: 0.85rem 0; border: 1px solid #30363d; }
+    .prose-clean table { width: 100%; border-collapse: collapse; margin-bottom: 1rem; font-size: 0.82rem; }
+    .prose-clean th, .prose-clean td { border: 1px solid #30363d; padding: 0.45rem 0.65rem; text-align: left; }
     .prose-clean th { background: #161b22; color: #ffffff; font-weight: 600; }
     .prose-clean tr:nth-child(even) { background: #0d1117; }
-    .prose-clean blockquote { border-left: 4px solid #388bfd; padding-left: 1rem; color: #8b949e; margin: 1rem 0; }
+    .prose-clean blockquote { border-left: 3px solid #6366f1; padding-left: 0.75rem; color: #94a3b8; margin: 0.75rem 0; font-style: italic; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0b0f17; }
+    ::-webkit-scrollbar-thumb { background: #232b38; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #374151; }
   </style>
 </head>
-<body class="min-h-screen">
-  <div class="max-w-7xl mx-auto px-4 py-8">
-    <!-- Header -->
-    <header class="flex justify-between items-center mb-8 border-b border-gray-800 pb-5">
-      <div class="flex items-center space-x-3">
-        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 to-indigo-500 flex items-center justify-center text-white font-bold text-xl shadow-lg">
-          H
-        </div>
-        <div>
-          <h1 class="text-2xl font-bold text-white tracking-tight">Hermes 知识资产中心</h1>
-          <p class="text-xs text-gray-400">微信公众号 / 视频号 / 网页 / B站视频 / 图片多模态资产打包与 Agent 协同中枢</p>
-        </div>
-      </div>
-      <div class="flex items-center space-x-3 text-sm">
-        <span class="px-3 py-1 bg-gray-800 rounded-full text-emerald-400 border border-emerald-800/40 flex items-center gap-2">
-          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> 100% 本地 Git 脱机存储
-        </span>
-      </div>
-    </header>
-
-    <!-- Quick Ingestion Box -->
-    <div class="glass-card rounded-2xl p-6 mb-8 shadow-xl">
-      <h2 class="text-lg font-semibold text-white mb-3 flex items-center gap-2">
-        <i class="fa-solid fa-plus-circle text-emerald-400"></i> 一键录入新知识源
-      </h2>
-      <div class="flex flex-col md:flex-row gap-3">
-        <select id="selectDomain" class="bg-gray-900 border border-gray-700 rounded-xl px-3 py-3 text-white text-sm focus:outline-none focus:border-indigo-500">
-          <option value="">⚡ 智能识别领域</option>
-          <option value="business">💼 商业与商业模式</option>
-          <option value="ai_tech">🤖 AI科技与大模型</option>
-          <option value="architecture">🏛️ 建筑设计与空间计算</option>
-          <option value="3d_and_visual">🎨 三维与数字艺术</option>
-          <option value="product_and_design">💡 产品设计与体验</option>
-          <option value="engineering_and_dev">⚙️ 全栈开发与工程</option>
-        </select>
-        <input id="inputUrl" type="text" placeholder="粘贴微信公众号文章链接、微信视频号分享、B站视频地址、技术网页 URL 或图片路径..." 
-          class="flex-1 bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 text-sm">
-        <button onclick="readFromClip()" class="px-4 py-3 bg-gray-800 hover:bg-gray-700 text-gray-200 rounded-xl text-sm font-medium border border-gray-700 transition flex items-center gap-2 justify-center">
-          <i class="fa-regular fa-clipboard"></i> 粘贴剪贴板
-        </button>
-        <button id="btnIngest" onclick="handleIngest()" class="btn-gradient hover:opacity-95 text-white px-6 py-3 rounded-xl text-sm font-semibold transition flex items-center gap-2 justify-center shadow-lg">
-          <i class="fa-solid fa-bolt"></i> 采集并归包
-        </button>
-      </div>
-      <div id="ingestStatus" class="mt-3 text-xs hidden"></div>
-      <div class="mt-3 text-xs text-gray-500 flex flex-wrap gap-4">
-        <span><i class="fa-brands fa-weixin text-green-500 mr-1"></i> 本地永久离线保存配图与正文（杜绝链接失效）</span>
-        <span><i class="fa-solid fa-code-merge text-purple-400 mr-1"></i> 自动增量去重融合（同类知识提炼增量，杜绝重复冗余）</span>
-        <span><i class="fa-solid fa-microchip text-blue-400 mr-1"></i> 结构化提取：硬件配置 / 运行环境 / 能否本地 / 优劣势</span>
-      </div>
-    </div>
-
-    <!-- Main Workspace -->
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
-      <!-- Left: Packages List -->
-      <div class="lg:col-span-4 space-y-4">
-        <div class="flex justify-between items-center">
-          <h3 class="text-base font-semibold text-white flex items-center gap-2">
-            <i class="fa-solid fa-cubes text-indigo-400"></i> 知识资产包 (<span id="pkgCount">0</span>)
-          </h3>
-          <button onclick="loadPackages()" class="text-xs text-gray-400 hover:text-white"><i class="fa-solid fa-arrows-rotate"></i> 刷新</button>
-        </div>
-
-        <!-- Domain Filter Tabs -->
-        <div class="flex flex-wrap gap-1.5 pb-1 text-xs" id="domainFilterTabs">
-          <button onclick="filterDomain('all')" class="px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-medium dom-btn" data-dom="all">全部</button>
-          <button onclick="filterDomain('business')" class="px-2 py-1 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 dom-btn" data-dom="business">💼 商业</button>
-          <button onclick="filterDomain('ai_tech')" class="px-2 py-1 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 dom-btn" data-dom="ai_tech">🤖 AI</button>
-          <button onclick="filterDomain('architecture')" class="px-2 py-1 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 dom-btn" data-dom="architecture">🏛️ 建筑</button>
-          <button onclick="filterDomain('3d_and_visual')" class="px-2 py-1 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 dom-btn" data-dom="3d_and_visual">🎨 3D</button>
-        </div>
-
-        <div id="packagesContainer" class="space-y-3">
-          <div class="p-8 text-center text-gray-500 text-sm">加载资产包中...</div>
-        </div>
-      </div>
-
-      <!-- Right: Package Viewer & Agent Export Panel -->
-      <div class="lg:col-span-8">
-        <div id="detailsCard" class="glass-card rounded-2xl p-6 min-h-[500px]">
-          <div class="text-center py-20 text-gray-500">
-            <i class="fa-solid fa-arrow-left text-3xl mb-3 text-gray-600 block"></i>
-            请在左侧选择一个知识资产包，查看结构化知识矩阵、离线存档及向 Cursor / Codex / Hermes 一键派发
-          </div>
-        </div>
-      </div>
+<body class="min-h-screen flex flex-col">
+  <!-- Toast Notification Container -->
+  <div id="toast" class="fixed top-5 right-5 z-50 transform transition-all duration-300 translate-y-[-100px] opacity-0 pointer-events-none">
+    <div id="toastContent" class="glass-card px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 text-sm font-medium border border-indigo-500/50">
+      <i id="toastIcon" class="fa-solid fa-circle-check text-emerald-400"></i>
+      <span id="toastMsg" class="text-white">通知内容</span>
     </div>
   </div>
 
-  <!-- Local Offline Reader Modal (本地脱机阅读器) -->
+  <!-- Top Sticky Header -->
+  <header class="sticky top-0 z-40 bg-[#0b0f17]/90 backdrop-blur-md border-b border-gray-800/80 px-5 py-3">
+    <div class="max-w-[1720px] mx-auto flex items-center justify-between gap-4">
+      <!-- Logo & Title -->
+      <div class="flex items-center space-x-3 shrink-0">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center text-white font-extrabold text-lg shadow-md shadow-indigo-500/20">
+          H
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-base font-bold text-white tracking-tight">Hermes 知识资产中心</h1>
+            <span class="text-[10px] bg-indigo-950/80 text-indigo-300 border border-indigo-800/60 px-1.5 py-0.2 rounded font-mono">v2.0</span>
+          </div>
+          <p class="text-[11px] text-gray-400">微信/视频号/B站/网页/图片多模态沉淀 · 纯本地 Git 离线脱机存储</p>
+        </div>
+      </div>
+
+      <!-- Center: Global Real-time Search -->
+      <div class="flex-1 max-w-2xl relative">
+        <div class="relative flex items-center">
+          <i class="fa-solid fa-magnifying-glass absolute left-3.5 text-gray-400 text-xs"></i>
+          <input id="globalSearchInput" type="text" oninput="handleSearch(this.value)" placeholder="全库实时检索：资产包、技术实体、硬件配置、代码或作者... (支持全文字段匹配)" 
+            class="w-full bg-gray-900/90 border border-gray-700/80 rounded-xl pl-9 pr-8 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 transition shadow-inner">
+          <button id="btnClearSearch" onclick="clearSearch()" class="absolute right-3 text-gray-400 hover:text-white hidden text-xs">
+            <i class="fa-solid fa-circle-xmark"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Right Actions & Status Badges -->
+      <div class="flex items-center space-x-3 shrink-0 text-xs">
+        <div class="hidden sm:flex items-center gap-2 bg-gray-900 border border-gray-800 px-3 py-1.5 rounded-xl text-gray-300 font-mono">
+          <i class="fa-solid fa-cubes text-indigo-400"></i>
+          <span id="statPkgCount">0</span> 资产包
+          <span class="text-gray-600">|</span>
+          <i class="fa-solid fa-file-shield text-emerald-400"></i>
+          <span id="statSrcCount">0</span> 脱机文档
+        </div>
+        <button onclick="toggleIngestPanel()" class="btn-gradient hover:opacity-95 text-white px-3.5 py-1.5 rounded-xl font-medium transition flex items-center gap-1.5 shadow">
+          <i class="fa-solid fa-plus-circle"></i> 录入新知识
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Collapsible Ingestion Panel -->
+  <div id="ingestPanel" class="bg-gray-950/95 border-b border-gray-800/80 px-6 py-5 hidden transition-all">
+    <div class="max-w-[1720px] mx-auto">
+      <div class="flex justify-between items-center mb-3">
+        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+          <i class="fa-solid fa-bolt text-emerald-400"></i> 一键极速采集并结构化入库
+        </h3>
+        <span class="text-xs text-gray-400">支持：微信公众号文章、视频号分享卡片、B站视频(免下原片截取关键帧)、技术网页、本地图片</span>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
+        <!-- 一级领域选择 -->
+        <div class="md:col-span-2">
+          <select id="selectDomain" onchange="handleDomainChange()" class="w-full bg-gray-900 border border-gray-700 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-indigo-500">
+            <option value="">⚡ 智能识别一级领域</option>
+            <option value="ai_tech">🤖 AI科技与大模型</option>
+            <option value="business">💼 商业与商业模式</option>
+            <option value="architecture">🏛️ 建筑设计与空间计算</option>
+            <option value="3d_visual">🎨 三维与数字艺术</option>
+            <option value="engineering">⚙️ 全栈工程与研发</option>
+            <option value="inbox">📥 待整理临时收件箱</option>
+          </select>
+        </div>
+        <!-- 二级子方向选择 -->
+        <div class="md:col-span-2">
+          <select id="selectSubCategory" class="w-full bg-gray-900 border border-gray-700 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-indigo-500">
+            <option value="">📌 智能识别二级子方向</option>
+          </select>
+        </div>
+        <!-- URL 输入 -->
+        <div class="md:col-span-6 flex gap-2">
+          <input id="inputUrl" type="text" placeholder="粘贴微信公众号文章链接、视频号分享文本、B站视频地址、网页 URL 或图片路径..." 
+            class="flex-1 bg-gray-900 border border-gray-700 rounded-xl px-3.5 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 text-xs">
+          <button onclick="readFromClip()" class="px-3 py-2 bg-gray-800 hover:bg-gray-700 text-gray-200 rounded-xl text-xs font-medium border border-gray-700 transition flex items-center gap-1.5 shrink-0">
+            <i class="fa-regular fa-clipboard"></i> 剪贴板
+          </button>
+        </div>
+        <!-- 提交采集按钮 -->
+        <div class="md:col-span-2">
+          <button id="btnIngest" onclick="handleIngest()" class="w-full btn-gradient hover:opacity-95 text-white py-2 rounded-xl text-xs font-semibold transition flex items-center justify-center gap-1.5 shadow">
+            <i class="fa-solid fa-download"></i> 抓取并增量归包
+          </button>
+        </div>
+      </div>
+      <div id="ingestStatus" class="mt-2 text-xs hidden"></div>
+    </div>
+  </div>
+
+  <!-- Main 3-Column Body -->
+  <main class="flex-1 max-w-[1720px] w-full mx-auto px-5 py-4 overflow-hidden flex flex-col">
+    <!-- Search Results View (Shown when searching) -->
+    <div id="searchResultsView" class="hidden flex-1 overflow-y-auto space-y-4">
+      <div class="flex justify-between items-center border-b border-gray-800 pb-3">
+        <h3 class="text-base font-bold text-white flex items-center gap-2">
+          <i class="fa-solid fa-magnifying-glass text-indigo-400"></i> 全库综合检索结果: <span id="searchQueryLabel" class="text-indigo-400 font-mono"></span>
+        </h3>
+        <button onclick="clearSearch()" class="text-xs text-gray-400 hover:text-white px-3 py-1 bg-gray-800 rounded-lg">
+          <i class="fa-solid fa-arrow-left mr-1"></i> 返回层级导航
+        </button>
+      </div>
+      <div id="searchResultsContent" class="space-y-6">
+        <!-- Rendered by JS -->
+      </div>
+    </div>
+
+    <!-- Normal 3-Pane Hierarchy View -->
+    <div id="normalHierarchyView" class="flex-1 grid grid-cols-12 gap-5 h-[calc(100vh-100px)]">
+      <!-- Column 1: Knowledge Taxonomy Tree (一级领域与二级专题导航) -->
+      <aside class="col-span-12 md:col-span-3 lg:col-span-2 flex flex-col glass-pane rounded-2xl p-3 overflow-hidden">
+        <div class="flex justify-between items-center px-2 py-2 border-b border-gray-800/80 mb-2">
+          <span class="text-xs font-bold uppercase tracking-wider text-gray-400 flex items-center gap-1.5">
+            <i class="fa-solid fa-sitemap text-indigo-400"></i> 知识层级分类
+          </span>
+          <button onclick="loadTaxonomy()" class="text-[11px] text-gray-400 hover:text-white" title="刷新分类"><i class="fa-solid fa-rotate-right"></i></button>
+        </div>
+        
+        <div class="flex-1 overflow-y-auto space-y-1.5 pr-1" id="taxonomyTree">
+          <!-- Rendered dynamically -->
+          <div class="text-center py-10 text-xs text-gray-500">加载层级树...</div>
+        </div>
+      </aside>
+
+      <!-- Column 2: Packages List (资产包精选卡片) -->
+      <section class="col-span-12 md:col-span-4 lg:col-span-3 flex flex-col glass-pane rounded-2xl p-3 overflow-hidden">
+        <div class="flex justify-between items-center px-2 py-2 border-b border-gray-800/80 mb-2">
+          <div>
+            <h3 id="currentFilterTitle" class="text-xs font-bold text-white flex items-center gap-1.5">
+              <i class="fa-solid fa-cubes text-indigo-400"></i> 全部知识资产包
+            </h3>
+            <span id="pkgListSubTitle" class="text-[10px] text-gray-400">包含 0 个资产包</span>
+          </div>
+          <button onclick="loadPackages()" class="text-[11px] text-gray-400 hover:text-white"><i class="fa-solid fa-arrows-rotate"></i></button>
+        </div>
+
+        <div class="flex-1 overflow-y-auto space-y-2 pr-1" id="packagesList">
+          <div class="text-center py-12 text-xs text-gray-500">加载中...</div>
+        </div>
+      </section>
+
+      <!-- Column 3: Package Inspector & Agent Dispatch Hub (资产包深度检视与 Agent 派发) -->
+      <section class="col-span-12 md:col-span-5 lg:col-span-7 flex flex-col glass-pane rounded-2xl p-5 overflow-hidden">
+        <div id="inspectorContent" class="flex-1 overflow-y-auto pr-2">
+          <div class="text-center py-32 text-gray-500">
+            <div class="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gray-900 border border-gray-800 flex items-center justify-center text-gray-600">
+              <i class="fa-solid fa-cubes-stacked text-3xl"></i>
+            </div>
+            <h4 class="text-sm font-semibold text-gray-400">请选择左侧的知识资产包</h4>
+            <p class="text-xs text-gray-500 mt-1">检视硬件/环境/优劣势对比矩阵、100%本地脱机源文，并一键派发给 Cursor、Codex 或 Hermes</p>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <!-- Local Offline Reader Modal (100% 本地脱机阅读器) -->
   <div id="readerModal" class="fixed inset-0 bg-black/85 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
     <div class="bg-gray-900 border border-gray-700 w-full max-w-4xl max-h-[90vh] rounded-2xl flex flex-col shadow-2xl">
       <div class="flex justify-between items-center px-6 py-4 border-b border-gray-800 bg-gray-950/80 rounded-t-2xl">
@@ -296,134 +428,274 @@ HTML_DASHBOARD = r"""
             </span>
             <span id="modalPath" class="text-[11px] text-gray-500 font-mono"></span>
           </div>
-          <h3 id="modalTitle" class="text-lg font-bold text-white mt-1"></h3>
+          <h3 id="modalTitle" class="text-base font-bold text-white mt-1"></h3>
         </div>
         <button onclick="closeReaderModal()" class="text-gray-400 hover:text-white p-2 rounded-lg bg-gray-800 hover:bg-gray-700 transition">
           <i class="fa-solid fa-xmark text-lg"></i>
         </button>
       </div>
-      <div id="modalBody" class="p-6 overflow-y-auto flex-1 text-sm text-gray-200 leading-relaxed font-sans space-y-4">
+      <div id="modalBody" class="p-6 overflow-y-auto flex-1 text-xs text-gray-200 leading-relaxed font-sans space-y-4">
       </div>
     </div>
   </div>
 
   <script>
+    let taxonomyData = null;
+    let currentDomain = 'all';
+    let currentSubCategory = 'all';
+    let currentCategoryName = '全部知识资产包';
     let activePackageId = null;
-    let currentDomainFilter = 'all';
+    let searchDebounceTimer = null;
 
-    function filterDomain(dom) {
-      currentDomainFilter = dom;
-      document.querySelectorAll('.dom-btn').forEach(btn => {
-        if (btn.dataset.dom === dom) {
-          btn.className = 'px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-medium dom-btn';
-        } else {
-          btn.className = 'px-2 py-1 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 dom-btn';
+    // Toast 浮动提示
+    function showToast(msg, isSuccess = true) {
+      const toast = document.getElementById('toast');
+      const toastMsg = document.getElementById('toastMsg');
+      const toastIcon = document.getElementById('toastIcon');
+      toastMsg.innerText = msg;
+      toastIcon.className = isSuccess ? 'fa-solid fa-circle-check text-emerald-400' : 'fa-solid fa-triangle-exclamation text-rose-400';
+      toast.classList.remove('translate-y-[-100px]', 'opacity-0', 'pointer-events-none');
+      setTimeout(() => {
+        toast.classList.add('translate-y-[-100px]', 'opacity-0', 'pointer-events-none');
+      }, 3500);
+    }
+
+    function toggleIngestPanel() {
+      const panel = document.getElementById('ingestPanel');
+      panel.classList.toggle('hidden');
+    }
+
+    // 处理领域联动二级子分类
+    function handleDomainChange() {
+      const domSelect = document.getElementById('selectDomain');
+      const subSelect = document.getElementById('selectSubCategory');
+      const domVal = domSelect.value;
+      subSelect.innerHTML = '<option value="">📌 智能识别二级子方向</option>';
+      if (!domVal || !taxonomyData || !taxonomyData.domains[domVal]) return;
+
+      const subCats = taxonomyData.domains[domVal].sub_categories || {};
+      for (const [subId, subInfo] of Object.entries(subCats)) {
+        const opt = document.createElement('option');
+        opt.value = subId;
+        opt.innerText = `${subInfo.icon || '📌'} ${subInfo.name}`;
+        subSelect.appendChild(opt);
+      }
+    }
+
+    // 1. 加载知识层级树 (Taxonomy Tree)
+    async function loadTaxonomy() {
+      try {
+        const res = await fetch('/api/taxonomy');
+        taxonomyData = await res.json();
+        const treeContainer = document.getElementById('taxonomyTree');
+        document.getElementById('statPkgCount').innerText = taxonomyData.total_packages || 0;
+        document.getElementById('statSrcCount').innerText = taxonomyData.total_sources || 0;
+
+        let html = `
+          <div onclick="selectCategory('all', 'all', '全部知识资产包')" 
+            class="px-2.5 py-2 rounded-xl cursor-pointer text-xs flex items-center justify-between transition border border-transparent hover:bg-gray-800/80 ${currentDomain === 'all' ? 'active-nav-item' : 'text-gray-300'}">
+            <span class="flex items-center gap-2 font-medium">
+              <i class="fa-solid fa-layer-group text-indigo-400"></i> 全部资产
+            </span>
+            <span class="text-[10px] bg-gray-800 text-gray-400 px-1.5 py-0.5 rounded font-mono">${taxonomyData.total_packages}</span>
+          </div>
+        `;
+
+        for (const [domKey, domInfo] of Object.entries(taxonomyData.domains)) {
+          const domStats = taxonomyData.stats[domKey] || {};
+          const domTotal = Object.values(domStats).reduce((a, b) => a + b, 0);
+          const isDomActive = currentDomain === domKey && currentSubCategory === 'all';
+
+          html += `
+            <div class="pt-1.5">
+              <div onclick="selectCategory('${domKey}', 'all', '${domInfo.name}')" 
+                class="px-2.5 py-1.5 rounded-xl cursor-pointer text-xs flex items-center justify-between transition border border-transparent hover:bg-gray-800/60 font-semibold ${isDomActive ? 'active-nav-item' : 'text-gray-200'}">
+                <span class="flex items-center gap-1.5 truncate">
+                  <span>${domInfo.icon || '📁'}</span>
+                  <span class="truncate">${domInfo.name}</span>
+                </span>
+                <span class="text-[10px] bg-gray-800/90 text-gray-400 px-1.5 py-0.2 rounded font-mono">${domTotal}</span>
+              </div>
+              <div class="pl-4 space-y-0.5 mt-0.5 border-l border-gray-800/80 ml-2">
+          `;
+
+          for (const [subKey, subInfo] of Object.entries(domInfo.sub_categories || {})) {
+            const count = domStats[subKey] || 0;
+            const isSubActive = currentDomain === domKey && currentSubCategory === subKey;
+            html += `
+              <div onclick="selectCategory('${domKey}', '${subKey}', '${subInfo.name}')" 
+                class="px-2 py-1 rounded-lg cursor-pointer text-[11px] flex items-center justify-between transition hover:bg-gray-800/50 ${isSubActive ? 'active-nav-item' : 'text-gray-400 hover:text-gray-200'}">
+                <span class="flex items-center gap-1.5 truncate">
+                  <span class="text-[10px]">${subInfo.icon || '📌'}</span>
+                  <span class="truncate">${subInfo.name}</span>
+                </span>
+                <span class="text-[10px] ${count > 0 ? 'text-indigo-400 font-bold' : 'text-gray-600'} font-mono">${count}</span>
+              </div>
+            `;
+          }
+
+          html += `
+              </div>
+            </div>
+          `;
         }
-      });
+
+        treeContainer.innerHTML = html;
+      } catch (e) {
+        console.error('Failed to load taxonomy:', e);
+      }
+    }
+
+    function selectCategory(dom, sub, name) {
+      currentDomain = dom;
+      currentSubCategory = sub;
+      currentCategoryName = name;
+      loadTaxonomy();
       loadPackages();
     }
 
+    // 2. 加载资产包列表
     async function loadPackages() {
       try {
-        const url = currentDomainFilter && currentDomainFilter !== 'all' ? `/api/packages?domain=${currentDomainFilter}` : '/api/packages';
+        let url = '/api/packages';
+        const params = [];
+        if (currentDomain !== 'all') params.push(`domain=${currentDomain}`);
+        if (currentSubCategory !== 'all') params.push(`sub=${currentSubCategory}`);
+        if (params.length > 0) url += '?' + params.join('&');
+
         const res = await fetch(url);
         const data = await res.json();
-        const container = document.getElementById('packagesContainer');
-        document.getElementById('pkgCount').innerText = data.packages.length;
+        const container = document.getElementById('packagesList');
+        document.getElementById('currentFilterTitle').innerHTML = `<i class="fa-solid fa-cubes text-indigo-400"></i> ${currentCategoryName}`;
+        document.getElementById('pkgListSubTitle').innerText = `包含 ${data.packages.length} 个知识资产包`;
+
         if (data.packages.length === 0) {
-          container.innerHTML = '<div class="glass-card p-6 rounded-xl text-center text-gray-400 text-sm">该分类下暂无资产包</div>';
+          container.innerHTML = `
+            <div class="text-center py-12 px-4 text-gray-500 text-xs">
+              <i class="fa-regular fa-folder-open text-2xl mb-2 text-gray-600 block"></i>
+              当前分类下暂无资产包<br>
+              <button onclick="toggleIngestPanel()" class="mt-3 text-indigo-400 hover:underline">立即录入第一篇资料</button>
+            </div>
+          `;
+          if (!activePackageId) {
+            document.getElementById('inspectorContent').innerHTML = `
+              <div class="text-center py-32 text-gray-500">
+                <h4 class="text-sm font-semibold text-gray-400">当前分类无资产包</h4>
+                <p class="text-xs text-gray-500 mt-1">请选择其它分类或录入新知识源</p>
+              </div>
+            `;
+          }
           return;
         }
+
         container.innerHTML = data.packages.map(p => `
-          <div onclick="selectPackage('${p.id}')" class="glass-card hover:border-indigo-500/60 transition p-4 rounded-xl cursor-pointer ${activePackageId === p.id ? 'border-indigo-500 bg-gray-800/90' : ''}">
+          <div onclick="selectPackage('${p.id}')" 
+            class="glass-card hover:border-indigo-500/60 transition p-3.5 rounded-xl cursor-pointer relative group ${activePackageId === p.id ? 'active-pkg-card' : ''}">
             <div class="flex justify-between items-start mb-1">
-              <div>
-                <span class="text-[10px] text-indigo-400 font-mono">${p.domain_icon || '📁'} ${p.domain_name || '通用'}</span>
-                <h4 class="font-semibold text-white text-sm mt-0.5">${p.name}</h4>
+              <div class="pr-6">
+                <div class="flex items-center gap-1.5 text-[10px] text-indigo-400 font-mono">
+                  <span>${p.domain_icon || '📁'} ${p.domain_name || '通用'}</span>
+                  <span>/</span>
+                  <span class="text-gray-400">${p.sub_category_name || p.sub_category || '默认'}</span>
+                </div>
+                <h4 class="font-bold text-white text-xs mt-0.5 leading-snug">${p.name}</h4>
               </div>
-              <span class="text-xs px-2 py-0.5 bg-indigo-950/70 text-indigo-300 rounded border border-indigo-800/50">${p.item_count} 条</span>
+              <span class="text-[10px] px-1.5 py-0.5 bg-indigo-950/70 text-indigo-300 rounded border border-indigo-800/50 shrink-0 font-mono">${p.item_count} 条</span>
             </div>
-            <p class="text-xs text-gray-400 line-clamp-2 mb-2">${p.description}</p>
-            <div class="flex flex-wrap gap-1">
-              ${(p.tags || []).slice(0, 4).map(t => `<span class="text-[10px] bg-gray-800 text-gray-300 px-1.5 py-0.5 rounded">${t}</span>`).join('')}
+            <p class="text-[11px] text-gray-400 line-clamp-2 mb-2 leading-relaxed">${p.description}</p>
+            <div class="flex items-center justify-between pt-1">
+              <div class="flex flex-wrap gap-1">
+                ${(p.tags || []).slice(0, 3).map(t => `<span class="text-[9px] bg-gray-900 text-gray-300 px-1.5 py-0.5 rounded border border-gray-800">${t}</span>`).join('')}
+              </div>
+              <button onclick="deletePackage(event, '${p.id}', '${p.name}')" class="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-rose-400 p-1 transition" title="彻底删除此资产包">
+                <i class="fa-regular fa-trash-can text-xs"></i>
+              </button>
             </div>
           </div>
         `).join('');
 
-        if (!activePackageId && data.packages.length > 0) {
+        // 默认选中第一个
+        const exists = data.packages.find(p => p.id === activePackageId);
+        if (!exists && data.packages.length > 0) {
           selectPackage(data.packages[0].id);
         }
       } catch (e) {
-        console.error(e);
+        console.error('Failed to load packages:', e);
       }
     }
 
+    // 3. 选中并检视单个资产包
     async function selectPackage(pkgId) {
       activePackageId = pkgId;
+      document.querySelectorAll('#packagesList > div').forEach(el => {
+        el.classList.remove('active-pkg-card');
+      });
       loadPackages();
-      const container = document.getElementById('detailsCard');
-      container.innerHTML = '<div class="text-center py-20 text-gray-400">加载资产包详情与知识图谱...</div>';
+
+      const container = document.getElementById('inspectorContent');
+      container.innerHTML = '<div class="text-center py-20 text-gray-400 text-xs"><i class="fa-solid fa-spinner animate-spin text-lg mb-2 block"></i> 正在加载资产包知识图谱与结构化特性矩阵...</div>';
+
       try {
         const res = await fetch(`/api/packages/${pkgId}`);
         const data = await res.json();
         const p = data.metadata;
         const matrix = p.knowledge_matrix || [];
 
-        // 构建结构化知识卡片 HTML
+        // 构建结构化对比矩阵
         let matrixHtml = '';
         if (matrix.length > 0) {
           matrixHtml = `
-            <div class="mb-8">
+            <div class="mb-6">
               <div class="flex justify-between items-center mb-3">
-                <h4 class="text-sm font-semibold text-white flex items-center gap-2">
-                  <i class="fa-solid fa-microchip text-indigo-400"></i> 结构化特性与对比矩阵 (${matrix.length} 个核心方案/实体，已智能去重增量融合)
+                <h4 class="text-xs font-bold uppercase tracking-wider text-white flex items-center gap-2">
+                  <i class="fa-solid fa-microchip text-indigo-400"></i> 结构化特性与对比矩阵 (${matrix.length} 个核心方案/实体 · 智能去重增量融合)
                 </h4>
               </div>
-              <div class="grid grid-cols-1 gap-4">
+              <div class="space-y-4">
                 ${matrix.map((m, idx) => `
-                  <div class="bg-gray-900/90 border border-gray-800 p-4 rounded-xl space-y-3">
-                    <div class="flex justify-between items-start border-b border-gray-800 pb-2">
+                  <div class="bg-gray-900/90 border border-gray-800/90 p-4 rounded-xl space-y-3">
+                    <div class="flex justify-between items-start border-b border-gray-800 pb-2.5">
                       <div class="flex items-center gap-2">
-                        <span class="w-6 h-6 rounded-full bg-indigo-900 text-indigo-300 text-xs flex items-center justify-center font-bold">${idx}</span>
-                        <h5 class="text-sm font-bold text-white">${m.entity_name}</h5>
-                        ${m.merged_sources_count > 1 ? `<span class="text-[10px] bg-purple-950 text-purple-300 px-2 py-0.5 rounded border border-purple-800 flex items-center gap-1"><i class="fa-solid fa-code-merge"></i> 融合 ${m.merged_sources_count} 篇资料</span>` : ''}
+                        <span class="w-5 h-5 rounded-md bg-indigo-950 text-indigo-400 text-[10px] flex items-center justify-center font-bold border border-indigo-800/50">${idx + 1}</span>
+                        <h5 class="text-xs font-bold text-white">${m.entity_name}</h5>
+                        ${m.merged_sources_count > 1 ? `<span class="text-[9px] bg-purple-950 text-purple-300 px-1.5 py-0.5 rounded border border-purple-800 flex items-center gap-1"><i class="fa-solid fa-code-merge"></i> 融合 ${m.merged_sources_count} 篇资料</span>` : ''}
                       </div>
-                      <span class="text-xs px-2 py-0.5 rounded ${m.local_deployable.includes('纯本地') ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-amber-950 text-amber-400 border border-amber-800'}">
-                        ${m.local_deployable.split(' ')[0]} ${m.local_deployable.includes('纯本地') ? '纯本地可运行' : '混合架构'}
+                      <span class="text-[10px] px-2 py-0.5 rounded font-medium ${m.local_deployable.includes('纯本地') ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-amber-950 text-amber-400 border border-amber-800'}">
+                        ${m.local_deployable}
                       </span>
                     </div>
 
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
-                      <div class="bg-black/30 p-2.5 rounded-lg border border-gray-800/80">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px]">
+                      <div class="bg-black/30 p-2 rounded-lg border border-gray-800/60">
                         <span class="text-gray-400 block font-semibold mb-0.5"><i class="fa-solid fa-bullseye text-indigo-400 mr-1"></i> 核心功能与定位:</span>
                         <span class="text-gray-200">${m.core_function || '-'}</span>
                       </div>
-                      <div class="bg-black/30 p-2.5 rounded-lg border border-gray-800/80">
+                      <div class="bg-black/30 p-2 rounded-lg border border-gray-800/60">
                         <span class="text-gray-400 block font-semibold mb-0.5"><i class="fa-solid fa-memory text-yellow-400 mr-1"></i> 硬件配置要求:</span>
                         <span class="text-gray-200">${m.hardware_specs || '-'}</span>
                       </div>
-                      <div class="bg-black/30 p-2.5 rounded-lg border border-gray-800/80">
+                      <div class="bg-black/30 p-2 rounded-lg border border-gray-800/60">
                         <span class="text-gray-400 block font-semibold mb-0.5"><i class="fa-solid fa-cubes-stacked text-blue-400 mr-1"></i> 运行环境与依赖:</span>
                         <span class="text-gray-200">${m.environment || '-'}</span>
                       </div>
-                      <div class="bg-black/30 p-2.5 rounded-lg border border-gray-800/80">
+                      <div class="bg-black/30 p-2 rounded-lg border border-gray-800/60">
                         <span class="text-gray-400 block font-semibold mb-0.5"><i class="fa-solid fa-users text-emerald-400 mr-1"></i> 知识贡献来源:</span>
                         <span class="text-gray-200">${(m.sources_contributed || []).join(', ') || '-'}</span>
                       </div>
                     </div>
 
                     <!-- Advantages & Pitfalls -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs pt-1">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px] pt-1">
                       <div class="bg-emerald-950/20 border border-emerald-800/30 p-2.5 rounded-lg">
                         <span class="text-emerald-400 font-semibold block mb-1"><i class="fa-solid fa-thumbs-up mr-1"></i> 同类核心优势:</span>
                         <ul class="list-disc list-inside space-y-0.5 text-gray-300">
-                          ${(m.competitive_advantages || []).slice(0, 4).map(a => `<li>${a}</li>`).join('')}
+                          ${(m.competitive_advantages || []).slice(0, 5).map(a => `<li>${a}</li>`).join('')}
                         </ul>
                       </div>
                       <div class="bg-rose-950/20 border border-rose-800/30 p-2.5 rounded-lg">
                         <span class="text-rose-400 font-semibold block mb-1"><i class="fa-solid fa-triangle-exclamation mr-1"></i> 劣势、边界与避坑要点:</span>
                         <ul class="list-disc list-inside space-y-0.5 text-gray-300">
-                          ${(m.limitations_and_pitfalls || []).slice(0, 4).map(pt => `<li>${pt}</li>`).join('')}
+                          ${(m.limitations_and_pitfalls || []).slice(0, 5).map(pt => `<li>${pt}</li>`).join('')}
                         </ul>
                       </div>
                     </div>
@@ -435,22 +707,32 @@ HTML_DASHBOARD = r"""
         }
 
         container.innerHTML = `
-          <div class="border-b border-gray-800 pb-4 mb-6">
-            <div class="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
+          <!-- Breadcrumb & Actions Bar -->
+          <div class="border-b border-gray-800/80 pb-4 mb-5">
+            <div class="flex flex-col md:flex-row md:justify-between md:items-center gap-3">
               <div>
-                <span class="text-xs font-mono text-indigo-400"># PACKAGE: ${p.id}</span>
-                <h2 class="text-xl font-bold text-white mt-1">${p.name}</h2>
-                <p class="text-xs text-gray-400 mt-1">${p.description}</p>
+                <div class="flex items-center gap-1.5 text-[11px] font-mono text-indigo-400 mb-1">
+                  <span>${p.domain_icon || '📁'} ${p.domain_name}</span>
+                  <span>></span>
+                  <span>${p.sub_category_name || p.sub_category}</span>
+                  <span>></span>
+                  <span class="text-gray-400">#${p.id}</span>
+                </div>
+                <h2 class="text-lg font-bold text-white tracking-tight">${p.name}</h2>
+                <p class="text-xs text-gray-400 mt-0.5">${p.description}</p>
               </div>
-              <div class="flex flex-wrap gap-2">
-                <button onclick="exportToAgent('${p.id}', 'cursor')" class="btn-agent hover:opacity-90 text-white px-3 py-2 rounded-lg text-xs font-medium flex items-center gap-1.5 shadow">
-                  <i class="fa-solid fa-code"></i> 复制为 Cursor Rule
+              <div class="flex flex-wrap gap-2 shrink-0">
+                <button onclick="exportToAgent('${p.id}', 'cursor')" class="btn-agent hover:opacity-90 text-white px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 shadow" title="复制为 Cursor Rule 上下文">
+                  <i class="fa-solid fa-code"></i> Cursor Rule (.mdc)
                 </button>
-                <button onclick="exportToAgent('${p.id}', 'codex')" class="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg text-xs font-medium flex items-center gap-1.5 shadow">
-                  <i class="fa-solid fa-robot"></i> 复制为 Codex Prompt
+                <button onclick="exportToAgent('${p.id}', 'codex')" class="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 shadow" title="复制为 Codex System Prompt">
+                  <i class="fa-solid fa-robot"></i> Codex
                 </button>
-                <button onclick="exportToAgent('${p.id}', 'hermes')" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-lg text-xs font-medium flex items-center gap-1.5 shadow">
-                  <i class="fa-solid fa-brain"></i> 派发给 Hermes Agent
+                <button onclick="exportToAgent('${p.id}', 'hermes')" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 shadow" title="派发给 Hermes Agent">
+                  <i class="fa-solid fa-brain"></i> Hermes
+                </button>
+                <button onclick="deletePackage(null, '${p.id}', '${p.name}')" class="bg-gray-800 hover:bg-rose-950 text-gray-400 hover:text-rose-400 px-2.5 py-1.5 rounded-lg text-xs font-medium border border-gray-700 transition" title="删除此资产包">
+                  <i class="fa-regular fa-trash-can"></i>
                 </button>
               </div>
             </div>
@@ -462,14 +744,14 @@ HTML_DASHBOARD = r"""
           <!-- Video Keyframes Section (if any) -->
           ${data.keyframes.length > 0 ? `
             <div class="mb-6">
-              <h4 class="text-sm font-semibold text-white mb-3 flex items-center gap-2">
-                <i class="fa-solid fa-photo-film text-blue-400"></i> 视频关键帧画廊 (${data.keyframes.length} 张高清画面，零原视频空间占用)
+              <h4 class="text-xs font-bold uppercase tracking-wider text-white mb-2.5 flex items-center gap-2">
+                <i class="fa-solid fa-photo-film text-blue-400"></i> 视频关键帧画廊 (${data.keyframes.length} 张高清画面 · 零原片空间浪费)
               </h4>
-              <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+              <div class="grid grid-cols-2 md:grid-cols-3 gap-2.5">
                 ${data.keyframes.map(k => `
                   <div class="group relative rounded-lg overflow-hidden border border-gray-800 bg-black">
-                    <img src="${k}" class="w-full h-32 object-cover group-hover:scale-105 transition duration-200">
-                    <div class="absolute bottom-0 inset-x-0 bg-black/70 text-[10px] text-gray-300 px-2 py-1 truncate">${k.split('/').pop()}</div>
+                    <img src="${k}" class="w-full h-28 object-cover group-hover:scale-105 transition duration-200">
+                    <div class="absolute bottom-0 inset-x-0 bg-black/80 text-[10px] text-gray-300 px-2 py-0.5 truncate font-mono">${k.split('/').pop()}</div>
                   </div>
                 `).join('')}
               </div>
@@ -478,45 +760,48 @@ HTML_DASHBOARD = r"""
 
           <!-- Sources List with 100% Offline Reader -->
           <div class="mb-6">
-            <h4 class="text-sm font-semibold text-white mb-2 flex items-center gap-2">
-              <i class="fa-solid fa-book-bookmark text-emerald-400"></i> 知识来源清单 (${(p.sources || []).length} 条本地永久脱机存档)
+            <h4 class="text-xs font-bold uppercase tracking-wider text-white mb-2.5 flex items-center gap-2">
+              <i class="fa-solid fa-book-bookmark text-emerald-400"></i> 知识来源与本地脱机存档 (${(p.sources || []).length} 篇脱机归档)
             </h4>
             <div class="space-y-2">
               ${(p.sources || []).map(s => `
-                <div class="bg-gray-900/80 border border-gray-800 p-3.5 rounded-xl flex flex-col md:flex-row md:justify-between md:items-center gap-2 text-xs">
+                <div class="bg-gray-900/80 border border-gray-800 p-3 rounded-xl flex flex-col md:flex-row md:justify-between md:items-center gap-2 text-xs">
                   <div>
                     <div class="flex items-center gap-2">
-                      <span class="text-indigo-400 font-semibold">[${s.type}]</span>
-                      <span class="text-gray-200 font-bold text-sm">${s.title}</span>
-                      ${s.incremental_merged ? `<span class="text-[10px] bg-purple-950 text-purple-300 px-2 py-0.5 rounded border border-purple-800/80"><i class="fa-solid fa-code-merge"></i> 增量融合至: ${s.associated_entity || '核心矩阵'}</span>` : ''}
+                      <span class="text-indigo-400 font-mono text-[10px]">[${s.type}]</span>
+                      <span class="text-gray-200 font-bold text-xs">${s.title}</span>
+                      ${s.incremental_merged ? `<span class="text-[9px] bg-purple-950 text-purple-300 px-1.5 py-0.2 rounded border border-purple-800/80 font-mono"><i class="fa-solid fa-code-merge"></i> 增量融合至: ${s.associated_entity || '核心矩阵'}</span>` : ''}
                     </div>
-                    <div class="text-gray-500 text-[11px] mt-1">
+                    <div class="text-gray-500 text-[10px] mt-1 flex flex-wrap gap-3">
                       <span><i class="fa-solid fa-user-pen mr-1"></i> 作者: ${s.author || '未知'}</span>
-                      <span class="mx-2">|</span>
                       <span><i class="fa-regular fa-clock mr-1"></i> 录入: ${s.ingested_at}</span>
-                      <span class="mx-2">|</span>
                       <span class="text-emerald-500 font-mono"><i class="fa-solid fa-file-shield mr-1"></i> ${s.file}</span>
                     </div>
                   </div>
-                  <div class="flex items-center gap-2">
-                    <button onclick="openLocalReader('${p.id}', '${s.file}', '${encodeURIComponent(s.title)}')" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow transition">
-                      <i class="fa-solid fa-book-open"></i> 本地脱机阅读 (100%保存)
+                  <div class="flex items-center gap-2 shrink-0">
+                    <button onclick="openLocalReader('${p.id}', '${s.file}', '${encodeURIComponent(s.title)}')" class="px-2.5 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg text-xs font-medium flex items-center gap-1.5 shadow transition">
+                      <i class="fa-solid fa-book-open"></i> 本地脱机阅读
                     </button>
-                    <a href="${s.url}" target="_blank" class="px-2.5 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-400 rounded-lg text-xs flex items-center gap-1">
-                      原网页 <i class="fa-solid fa-arrow-up-right-from-square"></i>
-                    </a>
+                    ${s.url ? `
+                      <a href="${s.url}" target="_blank" class="px-2 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-400 rounded-lg text-xs flex items-center gap-1">
+                        原网 <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+                      </a>
+                    ` : ''}
+                    <button onclick="deleteSource('${p.id}', '${s.file}')" class="text-gray-500 hover:text-rose-400 p-1.5 rounded-lg hover:bg-gray-800 transition" title="删除此资料文件">
+                      <i class="fa-regular fa-trash-can"></i>
+                    </button>
                   </div>
                 </div>
               `).join('')}
             </div>
           </div>
 
-          <!-- Knowledge Synthesis Markdown -->
+          <!-- SUMMARY.md Preview -->
           <div>
-            <h4 class="text-sm font-semibold text-white mb-2 flex items-center gap-2">
-              <i class="fa-solid fa-file-waveform text-purple-400"></i> 资产包聚合知识体系大纲 (SUMMARY.md 渲染预览)
+            <h4 class="text-xs font-bold uppercase tracking-wider text-white mb-2 flex items-center gap-2">
+              <i class="fa-solid fa-file-waveform text-purple-400"></i> 资产包聚合体系大纲 (SUMMARY.md 渲染预览)
             </h4>
-            <div class="bg-gray-900/90 border border-gray-800 p-5 rounded-xl text-xs text-gray-300 max-h-96 overflow-y-auto leading-relaxed prose-clean">
+            <div class="bg-gray-900/90 border border-gray-800 p-4 rounded-xl text-xs text-gray-300 max-h-80 overflow-y-auto leading-relaxed prose-clean">
               ${marked.parse(data.summary)}
             </div>
           </div>
@@ -526,6 +811,209 @@ HTML_DASHBOARD = r"""
       }
     }
 
+    // 4. 全局检索
+    function handleSearch(val) {
+      clearTimeout(searchDebounceTimer);
+      const btnClear = document.getElementById('btnClearSearch');
+      if (val.trim()) {
+        btnClear.classList.remove('hidden');
+      } else {
+        btnClear.classList.add('hidden');
+        clearSearch();
+        return;
+      }
+
+      searchDebounceTimer = setTimeout(async () => {
+        const query = val.trim();
+        if (!query) return;
+
+        const normalView = document.getElementById('normalHierarchyView');
+        const searchView = document.getElementById('searchResultsView');
+        const queryLabel = document.getElementById('searchQueryLabel');
+        const content = document.getElementById('searchResultsContent');
+
+        normalView.classList.add('hidden');
+        searchView.classList.remove('hidden');
+        queryLabel.innerText = `"${query}"`;
+        content.innerHTML = '<div class="text-center py-20 text-gray-400 text-xs"><i class="fa-solid fa-spinner animate-spin text-lg mb-2 block"></i> 正在全库深度检索...</div>';
+
+        try {
+          const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+          const data = await res.json();
+          let html = '';
+
+          // 匹配到的资产包
+          if (data.packages && data.packages.length > 0) {
+            html += `
+              <div>
+                <h4 class="text-xs font-bold uppercase tracking-wider text-white mb-3 flex items-center gap-2">
+                  <i class="fa-solid fa-cubes text-indigo-400"></i> 匹配的知识资产包 (${data.packages.length})
+                </h4>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  ${data.packages.map(p => `
+                    <div onclick="jumpToPackage('${p.id}')" class="glass-card hover:border-indigo-500/60 p-3.5 rounded-xl cursor-pointer transition">
+                      <div class="flex justify-between items-start">
+                        <h5 class="text-xs font-bold text-white">${p.name}</h5>
+                        <span class="text-[10px] bg-indigo-950 text-indigo-300 px-1.5 py-0.5 rounded font-mono">得分: ${p.score}</span>
+                      </div>
+                      <p class="text-[11px] text-gray-400 line-clamp-2 mt-1 mb-2">${p.description}</p>
+                      <div class="flex flex-wrap gap-1">
+                        ${(p.tags || []).map(t => `<span class="text-[9px] bg-gray-900 text-gray-400 px-1.5 py-0.5 rounded border border-gray-800">${t}</span>`).join('')}
+                      </div>
+                    </div>
+                  `).join('')}
+                </div>
+              </div>
+            `;
+          }
+
+          // 匹配到的具体文档片段
+          if (data.sources && data.sources.length > 0) {
+            html += `
+              <div>
+                <h4 class="text-xs font-bold uppercase tracking-wider text-white mb-3 flex items-center gap-2">
+                  <i class="fa-solid fa-file-lines text-emerald-400"></i> 匹配的脱机文献与正文片段 (${data.sources.length})
+                </h4>
+                <div class="space-y-2">
+                  ${data.sources.map(s => `
+                    <div class="bg-gray-900/90 border border-gray-800 p-3 rounded-xl flex justify-between items-center text-xs">
+                      <div class="flex-1 pr-4">
+                        <div class="flex items-center gap-2">
+                          <span class="text-[10px] text-indigo-400 font-mono">[${s.package_name}]</span>
+                          <span class="text-white font-medium">${s.filename}</span>
+                        </div>
+                        <p class="text-[11px] text-gray-400 mt-1 font-mono bg-black/40 px-2 py-1 rounded border border-gray-800/80">${s.snippet}</p>
+                      </div>
+                      <button onclick="openLocalReader('${s.package_id}', 'sources/${s.filename}', '${encodeURIComponent(s.filename)}')" class="px-2.5 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg text-xs font-medium flex items-center gap-1.5 shrink-0">
+                        <i class="fa-solid fa-book-open"></i> 本地脱机阅读
+                      </button>
+                    </div>
+                  `).join('')}
+                </div>
+              </div>
+            `;
+          }
+
+          if (!html) {
+            html = '<div class="text-center py-20 text-gray-500 text-xs">未找到包含该关键词的内容</div>';
+          }
+
+          content.innerHTML = html;
+        } catch (e) {
+          content.innerHTML = `<div class="text-rose-400 text-xs">检索出错: ${e.message}</div>`;
+        }
+      }, 300);
+    }
+
+    function clearSearch() {
+      document.getElementById('globalSearchInput').value = '';
+      document.getElementById('btnClearSearch').classList.add('hidden');
+      document.getElementById('searchResultsView').classList.add('hidden');
+      document.getElementById('normalHierarchyView').classList.remove('hidden');
+    }
+
+    function jumpToPackage(pkgId) {
+      clearSearch();
+      selectCategory('all', 'all', '全部知识资产包');
+      selectPackage(pkgId);
+    }
+
+    // 5. 极速采集
+    async function handleIngest() {
+      const urlInput = document.getElementById('inputUrl');
+      const statusDiv = document.getElementById('ingestStatus');
+      const btn = document.getElementById('btnIngest');
+      const url = urlInput.value.trim();
+
+      if (!url) {
+        showToast('请输入采集链接或粘贴内容', false);
+        return;
+      }
+
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner animate-spin"></i> 采集与增量融合中...';
+      statusDiv.className = 'mt-2 text-xs text-indigo-400 block';
+      statusDiv.innerText = '正在智能路由输入源、清洗正文、提取关键帧与硬件/环境特性...';
+
+      try {
+        const domain = document.getElementById('selectDomain').value;
+        const subCategory = document.getElementById('selectSubCategory').value;
+        const res = await fetch('/api/ingest', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            url, 
+            domain: domain || null,
+            sub_category: subCategory || null
+          })
+        });
+        const data = await res.json();
+        if (data.success) {
+          statusDiv.className = 'mt-2 text-xs text-emerald-400 block';
+          statusDiv.innerText = `成功录入《${data.title}》！归入 [${data.domain_icon || '📁'} ${data.domain_name} > ${data.sub_category_name || '专题'}]，Git: ${data.commit || 'ok'}`;
+          urlInput.value = '';
+          showToast(`成功沉淀《${data.title.slice(0, 20)}...》至资产包！`);
+          await loadTaxonomy();
+          await loadPackages();
+          selectPackage(data.package_id);
+        } else {
+          throw new Error(data.detail || '录入失败');
+        }
+      } catch (e) {
+        statusDiv.className = 'mt-2 text-xs text-rose-400 block';
+        statusDiv.innerText = '录入异常: ' + e.message;
+        showToast('采集失败: ' + e.message, false);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-download"></i> 抓取并增量归包';
+      }
+    }
+
+    // 6. 删除资产包
+    async function deletePackage(event, pkgId, pkgName) {
+      if (event) event.stopPropagation();
+      if (!confirm(`确定要彻底删除知识资产包「${pkgName}」及其全部离线文件吗？此操作无法撤销！`)) {
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/packages/${pkgId}`, {method: 'DELETE'});
+        const data = await res.json();
+        if (data.success) {
+          showToast(`已彻底删除资产包: ${pkgName}`);
+          if (activePackageId === pkgId) activePackageId = null;
+          await loadTaxonomy();
+          await loadPackages();
+        } else {
+          showToast('删除失败: ' + (data.detail || '未知错误'), false);
+        }
+      } catch (e) {
+        showToast('删除异常: ' + e.message, false);
+      }
+    }
+
+    // 7. 删除单篇源资料并重新增量合成
+    async function deleteSource(pkgId, sourceFile) {
+      if (!confirm(`确定要从此资产包中删除资料「${sourceFile}」吗？系统将自动重新合成对比矩阵！`)) {
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/packages/${pkgId}/sources?file=${encodeURIComponent(sourceFile)}`, {method: 'DELETE'});
+        const data = await res.json();
+        if (data.success) {
+          showToast('资料已删除，知识图谱已重新增量合成！');
+          selectPackage(pkgId);
+          loadTaxonomy();
+        } else {
+          showToast('删除失败: ' + (data.detail || '未知错误'), false);
+        }
+      } catch (e) {
+        showToast('删除异常: ' + e.message, false);
+      }
+    }
+
+    // 8. 本地脱机阅读器
     async function openLocalReader(pkgId, file, encodedTitle) {
       const modal = document.getElementById('readerModal');
       const modalTitle = document.getElementById('modalTitle');
@@ -548,15 +1036,14 @@ HTML_DASHBOARD = r"""
           if (parts.length >= 3) {
             content = parts[2];
             fmHtml = `
-              <div class="bg-black/50 p-4 rounded-xl border border-gray-800 mb-6 font-mono text-xs">
+              <div class="bg-black/50 p-3 rounded-xl border border-gray-800 mb-4 font-mono text-[11px]">
                 <span class="text-indigo-400 font-bold block mb-1"><i class="fa-solid fa-fingerprint mr-1"></i> 本地脱机归档元数据 (YAML Frontmatter):</span>
-                <pre class="text-emerald-400 text-[11px] whitespace-pre-wrap">${parts[1].trim()}</pre>
+                <pre class="text-emerald-400 whitespace-pre-wrap">${parts[1].trim()}</pre>
               </div>
             `;
           }
         }
 
-        // 替换本地图片路径以正确显示离线图片
         content = content.replace(/\(assets\//g, `(/packages/${pkgId}/assets/`);
         content = content.replace(/\(keyframes\//g, `(/packages/${pkgId}/keyframes/`);
 
@@ -571,6 +1058,7 @@ HTML_DASHBOARD = r"""
       document.getElementById('readerModal').classList.add('hidden');
     }
 
+    // 9. 一键派发给 Agent
     async function exportToAgent(pkgId, target) {
       try {
         const res = await fetch(`/api/export/${pkgId}?target=${target}`);
@@ -580,67 +1068,43 @@ HTML_DASHBOARD = r"""
           headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({text: data.content})
         });
-        alert(`已成功生成并复制专用于 ${target.toUpperCase()} 的知识参考上下文！直接在 ${target} 聊天框或项目中粘贴即可。`);
+        showToast(`已生成并复制专用于 ${target.toUpperCase()} 的知识上下文！直接在项目中粘贴即可。`);
       } catch (e) {
-        alert('导出失败: ' + e);
+        showToast('导出失败: ' + e, false);
       }
     }
 
+    // 10. 读取剪贴板
     async function readFromClip() {
       try {
         const res = await fetch('/api/clipboard');
         const data = await res.json();
         if (data.text) {
           document.getElementById('inputUrl').value = data.text;
+          showToast('已从 macOS 剪贴板自动填入');
+        } else {
+          showToast('剪贴板中无内容', false);
         }
       } catch (e) {
         console.error(e);
       }
     }
 
-    async function handleIngest() {
-      const urlInput = document.getElementById('inputUrl');
-      const statusDiv = document.getElementById('ingestStatus');
-      const btn = document.getElementById('btnIngest');
-      const url = urlInput.value.trim();
-
-      if (!url) {
-        alert('请输入或粘贴链接内容');
-        return;
+    // 快捷键支持
+    window.addEventListener('keydown', (e) => {
+      if (e.key === '/' && document.activeElement.tagName !== 'INPUT') {
+        e.preventDefault();
+        document.getElementById('globalSearchInput').focus();
       }
-
-      btn.disabled = true;
-      btn.innerHTML = '<i class="fa-solid fa-spinner animate-spin"></i> 正在爬取、清洗离线保存与增量融合...';
-      statusDiv.className = 'mt-3 text-xs text-indigo-400 block';
-      statusDiv.innerText = '正在智能识别输入源、抓取内容并提取关键帧与代码片段...';
-
-      try {
-        const domain = document.getElementById('selectDomain').value;
-        const res = await fetch('/api/ingest', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({url, domain: domain || null})
-        });
-        const data = await res.json();
-        if (data.success) {
-          statusDiv.className = 'mt-3 text-xs text-emerald-400 block';
-          statusDiv.innerText = `成功录入《${data.title}》！归入 [${data.domain_icon || '📁'} ${data.domain_name}] > 资产包 [${data.package_name || data.package_id}]，Git提交: ${data.commit || 'ok'}`;
-          urlInput.value = '';
-          await loadPackages();
-          selectPackage(data.package_id);
-        } else {
-          throw new Error(data.detail || '录入失败');
-        }
-      } catch (e) {
-        statusDiv.className = 'mt-3 text-xs text-rose-400 block';
-        statusDiv.innerText = '录入异常: ' + e.message;
-      } finally {
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-bolt"></i> 采集并归包';
+      if (e.key === 'Escape') {
+        closeReaderModal();
       }
-    }
+    });
 
-    window.onload = loadPackages;
+    window.onload = async () => {
+      await loadTaxonomy();
+      await loadPackages();
+    };
   </script>
 </body>
 </html>

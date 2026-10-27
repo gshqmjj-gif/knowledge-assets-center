@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import yaml
 
-from config import PRIMARY_DOMAINS, PACKAGES_DIR, resolve_domain
+from config import PRIMARY_DOMAINS, PACKAGES_DIR, resolve_domain, resolve_sub_category
 from core.knowledge_distiller import KnowledgeDistiller
 from core.knowledge_merger import KnowledgeMerger
 from crawlers.base import IngestedItem
@@ -55,18 +55,25 @@ class KnowledgePackageManager:
         package_id: str,
         name: str,
         description: str = "",
-        domain: str = "general_inbox",
+        domain: str = "inbox",
+        sub_category: Optional[str] = None,
         tags: Optional[List[str]] = None
     ) -> Path:
-        """创建一个全新的知识资产包骨架"""
+        """创建一个全新的知识资产包骨架 (关联一级领域与二级子方向)"""
         clean_id = re.sub(r'[^a-zA-Z0-9_\-]', '_', package_id).lower().strip('_')
         pkg_dir = self.packages_dir / clean_id
         
-        # 匹配一级领域体系
+        # 匹配一级领域与二级子方向
         domain_key = resolve_domain(domain)
-        dom_info = PRIMARY_DOMAINS.get(domain_key, PRIMARY_DOMAINS["general_inbox"])
+        dom_info = PRIMARY_DOMAINS.get(domain_key, PRIMARY_DOMAINS["inbox"])
         domain_name = dom_info["name"]
         domain_icon = dom_info.get("icon", "📁")
+
+        sub_cats = dom_info.get("sub_categories", {})
+        sub_id = sub_category or list(sub_cats.keys())[0] if sub_cats else "general"
+        sub_info = sub_cats.get(sub_id, {})
+        sub_name = sub_info.get("name", sub_id)
+        sub_icon = sub_info.get("icon", "📌")
 
         # 创建目录结构
         (pkg_dir / "sources").mkdir(parents=True, exist_ok=True)
@@ -81,10 +88,14 @@ class KnowledgePackageManager:
             "domain": domain_key,
             "domain_name": domain_name,
             "domain_icon": domain_icon,
-            "tags": tags or [domain_name, "知识资产"],
+            "sub_category": sub_id,
+            "sub_category_name": sub_name,
+            "sub_category_icon": sub_icon,
+            "tags": tags or [domain_name, sub_name, "知识资产"],
             "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "item_count": 0,
+            "knowledge_matrix": [],
             "sources": []
         }
 
@@ -93,46 +104,123 @@ class KnowledgePackageManager:
 
         # 初始化 SUMMARY.md 和 AGENT_CONTEXT.md
         self._write_initial_summaries(pkg_dir, meta)
-        logger.info(f"Created knowledge asset package: {clean_id} ({name}) under domain [{domain_name}]")
+        logger.info(f"Created package: {clean_id} ({name}) under [{domain_name} > {sub_name}]")
         return pkg_dir
+
+    def delete_package(self, package_id: str) -> bool:
+        """彻底删除指定的知识资产包及其所有物理文件 (拒绝污染)"""
+        pkg_dir = self.packages_dir / package_id
+        if pkg_dir.exists() and pkg_dir.is_dir():
+            shutil.rmtree(pkg_dir)
+            logger.info(f"Deleted package {package_id} completely.")
+            return True
+        return False
+
+    def delete_source(self, package_id: str, source_filename: str) -> bool:
+        """从资产包中删除单篇文献，并重新增量合成知识矩阵"""
+        pkg_dir = self.packages_dir / package_id
+        if not pkg_dir.exists():
+            return False
+
+        meta_file = pkg_dir / "package.yaml"
+        with open(meta_file, "r", encoding="utf-8") as f:
+            meta = yaml.safe_load(f) or {}
+
+        # 找到并删除该源文件
+        sources = meta.get("sources", [])
+        new_sources = []
+        target_file_to_del = None
+        for s in sources:
+            if s.get("file") == source_filename or Path(s.get("file")).name == Path(source_filename).name:
+                target_file_to_del = pkg_dir / s.get("file")
+            else:
+                new_sources.append(s)
+
+        if target_file_to_del and target_file_to_del.exists():
+            try:
+                target_file_to_del.unlink()
+            except Exception:
+                pass
+
+        meta["sources"] = new_sources
+        meta["item_count"] = len(new_sources)
+        meta["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        # 重新增量重构知识矩阵
+        distiller = KnowledgeDistiller()
+        merger = KnowledgeMerger()
+        matrix = []
+        for s in reversed(new_sources):
+            sf = pkg_dir / s.get("file")
+            if sf.exists():
+                cnt = sf.read_text(encoding="utf-8")
+                if cnt.startswith("---"):
+                    parts = cnt.split("---", 2)
+                    if len(parts) >= 3:
+                        cnt = parts[2]
+                card = distiller.distill(s.get("title"), cnt, domain=meta.get("domain", "ai_tech"), source_label=s.get("author") or s.get("title")[:15])
+                matrix, is_merged, entity_name = merger.merge_card_into_matrix(matrix, card, s.get("author") or s.get("title")[:15])
+                s["associated_entity"] = entity_name
+                s["incremental_merged"] = is_merged
+
+        meta["knowledge_matrix"] = matrix
+        with open(meta_file, "w", encoding="utf-8") as f:
+            yaml.safe_dump(meta, f, allow_unicode=True, sort_keys=False)
+
+        self.synthesize_package(package_id)
+        logger.info(f"Deleted source {source_filename} from package {package_id} and re-synthesized.")
+        return True
 
     def route_item_to_package(
         self,
         item: IngestedItem,
         preferred_package: Optional[str] = None,
-        preferred_domain: Optional[str] = None
+        preferred_domain: Optional[str] = None,
+        preferred_sub_category: Optional[str] = None
     ) -> str:
         """
-        智能归类路由：根据领域偏好、文本内容、标题、标签与预设领域关键词，将知识路由到最适合的资产包
+        智能多级归类路由：根据领域偏好、子方向与关键词密度，将知识路由到最适合的资产包
         """
+        search_blob = f"{item.title} {item.summary} {' '.join(item.tags)} {item.content_markdown[:800]}".lower()
+
         # 1. 用户显式指定了资产包
         if preferred_package:
             pkg_id = re.sub(r'[^a-zA-Z0-9_\-]', '_', preferred_package).lower().strip('_')
             if not (self.packages_dir / pkg_id).exists():
-                domain_val = preferred_domain or "general_inbox"
-                self.create_package(pkg_id, name=preferred_package, domain=domain_val)
+                domain_val = preferred_domain or "inbox"
+                sub_id, _ = resolve_sub_category(domain_val, search_blob)
+                self.create_package(pkg_id, name=preferred_package, domain=domain_val, sub_category=sub_id)
             return pkg_id
 
-        # 2. 用户指定了一级领域 (例如 "商业", "AI科技", "建筑", "3D", "产品")
+        # 2. 用户指定了一级领域与子方向
         if preferred_domain:
             domain_key = resolve_domain(preferred_domain)
-            dom_info = PRIMARY_DOMAINS.get(domain_key, PRIMARY_DOMAINS["general_inbox"])
-            target_id = dom_info.get("default_package", domain_key)
-            if not (self.packages_dir / target_id).exists():
+            sub_id = preferred_sub_category
+            if not sub_id:
+                sub_id, sub_name = resolve_sub_category(domain_key, search_blob)
+            
+            # 查找该领域与子方向下是否已有对应资产包
+            for pkg in self.list_packages():
+                if pkg.get("domain") == domain_key and pkg.get("sub_category") == sub_id:
+                    return pkg.get("id")
+
+            # 若无，自动创建该子方向的专属资产包
+            dom_info = PRIMARY_DOMAINS.get(domain_key, PRIMARY_DOMAINS["inbox"])
+            sub_name = dom_info.get("sub_categories", {}).get(sub_id, {}).get("name", sub_id)
+            new_pkg_id = f"{domain_key}_{sub_id}"
+            if not (self.packages_dir / new_pkg_id).exists():
                 self.create_package(
-                    package_id=target_id,
-                    name=dom_info.get("default_package_name", dom_info["name"]),
-                    description=f"{dom_info['name']} 核心领域知识资产包",
+                    package_id=new_pkg_id,
+                    name=f"{sub_name}知识资产包",
+                    description=f"{dom_info['name']} > {sub_name} 专题领域知识沉淀",
                     domain=domain_key,
-                    tags=dom_info.get("keywords", [])[:5]
+                    sub_category=sub_id,
+                    tags=[dom_info['name'], sub_name]
                 )
-            return target_id
+            return new_pkg_id
 
-        # 3. 自动匹配现有资产包或预置一级领域
+        # 3. 全局自动匹配：优先匹配已有资产包
         existing_packages = self.list_packages()
-        search_blob = f"{item.title} {item.summary} {' '.join(item.tags)} {item.content_markdown[:800]}".lower()
-
-        # 优先匹配已有资产包
         best_pkg = None
         best_score = 0
         for pkg in existing_packages:
@@ -151,38 +239,42 @@ class KnowledgePackageManager:
         if best_pkg and best_score >= 4:
             return best_pkg
 
-        # 其次匹配一级领域
+        # 4. 其次自动匹配一级领域与二级子方向
         best_domain = None
         domain_max_matches = 0
         for domain_key, info in PRIMARY_DOMAINS.items():
-            keywords = info.get("keywords", [])
-            matches = sum(1 for kw in keywords if kw.lower() in search_blob)
+            matches = 0
+            for sub_id, sub_info in info.get("sub_categories", {}).items():
+                matches += sum(1 for kw in sub_info.get("keywords", []) if kw.lower() in search_blob)
             if matches > domain_max_matches:
                 domain_max_matches = matches
                 best_domain = (domain_key, info)
 
         if best_domain and domain_max_matches >= 2:
             domain_key, info = best_domain
-            target_id = info.get("default_package", domain_key)
+            sub_id, sub_name = resolve_sub_category(domain_key, search_blob)
+            target_id = f"{domain_key}_{sub_id}"
             if not (self.packages_dir / target_id).exists():
                 self.create_package(
                     package_id=target_id,
-                    name=info.get("default_package_name", info.get("name", target_id)),
-                    description=f"涵盖 {', '.join(info.get('keywords', [])[:6])} 等核心维度的专业知识资产包",
+                    name=f"{sub_name}知识资产包",
+                    description=f"{info['name']} > {sub_name} 专题领域沉淀",
                     domain=domain_key,
-                    tags=info.get("keywords", [])[:5]
+                    sub_category=sub_id,
+                    tags=[info['name'], sub_name]
                 )
             return target_id
 
-        # 兜底通用资产包
-        fallback_id = "general_knowledge_inbox"
+        # 5. 兜底通用收件箱
+        fallback_id = "inbox_quick_capture"
         if not (self.packages_dir / fallback_id).exists():
             self.create_package(
                 package_id=fallback_id,
-                name="通用知识与综合收藏",
-                description="新收藏待归档或跨领域的综合知识资产汇总",
-                domain="general_inbox",
-                tags=["通用知识", "待归档"]
+                name="临时待整理收件箱",
+                description="新收藏待归档或跨领域的综合知识暂存",
+                domain="inbox",
+                sub_category="quick_capture",
+                tags=["临时收藏", "待归档"]
             )
         return fallback_id
 
@@ -190,12 +282,13 @@ class KnowledgePackageManager:
         self,
         item: IngestedItem,
         preferred_package: Optional[str] = None,
-        preferred_domain: Optional[str] = None
+        preferred_domain: Optional[str] = None,
+        preferred_sub_category: Optional[str] = None
     ) -> Tuple[str, Path]:
         """
         核心方法：将抓取到的数据实体结构化拆分入库到知识资产包
         """
-        pkg_id = self.route_item_to_package(item, preferred_package, preferred_domain)
+        pkg_id = self.route_item_to_package(item, preferred_package, preferred_domain, preferred_sub_category)
         pkg_dir = self.packages_dir / pkg_id
 
         sources_dir = pkg_dir / "sources"

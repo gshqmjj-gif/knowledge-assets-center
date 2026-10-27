@@ -1,17 +1,9 @@
-# AGENT CONTEXT: 通用知识与综合收藏
+# AGENT CONTEXT: AI逆向分析与软件复刻流水线
 <!-- This file is auto-generated for Cursor, Codex and Hermes Agent Reference -->
-**Domain**: general_inbox | **Tags**: AI, 草稿鸭, 通用知识, 微信公众号, EARS, AI开源无界, 待归档
-**Description**: 新收藏待归档或跨领域的综合知识资产汇总
+**Domain**: ai_tech | **Tags**: 逆向工程, 代码复刻, REA, PentAGI, Codex, MCP
+**Description**: REA + Reverse-skill + PentAGI 自动化逆向、逻辑推演与 1:1 复刻工程流水线
 
 ## Structured Project Constraints & Technical Capabilities:
-### Target Entity: Claude
-- **Purpose**: Claude Opus 5.5是强，我看到很多代码炫酷耍帅的视频。
-- **Hardware Constraints**: 标准机器配置 (4G~8G 内存即可无痛运行)
-- **Runtime Environment**: Python 3.10+
-- **Deployment**: 🟢 本地命令行/独立工具 (无强联网依赖)
-- **Verified Advantages**: 模块解耦度高，支持无缝嵌入现有工作流; 输出带证据链追溯，结论可二次核对验证
-- **Strict Pitfalls & Gotchas**: 依赖外部环境版本一致性，版本漂移可能导致调用失败; 对于超大规模复杂项目，AI 一次性分析可能出现幻觉或切分过粗
-
 ### Target Entity: REA + Reverse-skill + PentAGI
 - **Purpose**: 分析我自己有权分析的软件功能
 - **Hardware Constraints**: 轻量级要求: 任意主流Mac/PC (8G+内存，无需高配独立显卡)
@@ -23,7 +15,7 @@
 ### 小白看不懂的地方 [增量补充: 草稿鸭]; 痛点是：逆向/分析要用一堆工具，新手根本不知道该用哪个、怎么装 [增量补充: 草稿鸭]; 合规边界：仅限合法研究或已授权目标，禁止碰商业加混淆与加密对抗目标 [增量补充: 草稿鸭]; 依赖链繁琐：涉及多工具串联，需预先配齐 MCP 协议与指定运行时版本 [增量补充: 草稿鸭]
 
 ## Project Constraints & Directives for Agent:
-1. You are operating as an expert specialist in 通用知识与综合收藏.
+1. You are operating as an expert specialist in AI逆向分析与软件复刻流水线.
 2. When generating code, strictly follow the hardware constraints and environment dependencies cataloged above.
 3. Do not re-download raw videos or save binary bloat; strictly use keyframes, transcripts, and atomic snippets.
 4. Respect the pitfalls and limitations outlined above to prevent dead ends.
@@ -31,4 +23,3 @@
 ## Included Sources & References:
 - **REA + Reverse-skill + PentAGI复刻任何软件** (Source: https://mp.weixin.qq.com/s/dK_p1fHAQA3u-zbn5er7ZA)
 - **我把 3 个 Star 过万的 Skill 串起来，搭了一条能“复刻任意软件”的流水线** (Source: https://mp.weixin.qq.com/s/bs7SwRd7GrVEiaI_ARDP0g)
-- **Opus 5.5，你竟然这样做视频～！** (Source: https://mp.weixin.qq.com/s/jZwxMX9nWsD0abzrPWe0Ig)

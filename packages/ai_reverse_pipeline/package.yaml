@@ -1,20 +1,19 @@
-id: general_knowledge_inbox
-name: 通用知识与综合收藏
-description: 新收藏待归档或跨领域的综合知识资产汇总
-domain: general_inbox
-domain_name: 通用知识与综合收藏
-domain_icon: 📥
+id: ai_reverse_pipeline
+name: AI逆向分析与软件复刻流水线
+description: REA + Reverse-skill + PentAGI 自动化逆向、逻辑推演与 1:1 复刻工程流水线
+domain: ai_tech
+domain_name: AI科技与大模型
+domain_icon: 🤖
 tags:
-- AI
-- 草稿鸭
-- 通用知识
-- 微信公众号
-- EARS
-- AI开源无界
-- 待归档
-created_at: '2026-10-26 20:53:07'
-updated_at: '2026-10-26 20:53:56'
-item_count: 3
+- 逆向工程
+- 代码复刻
+- REA
+- PentAGI
+- Codex
+- MCP
+created_at: '2026-10-26 22:50:20'
+updated_at: '2026-10-26 22:50:20'
+item_count: 2
 sources:
 - id: wechat_article_20261026_REA_+_Reverse-skill_+_PentAGI复刻任何软件
   title: REA + Reverse-skill + PentAGI复刻任何软件
@@ -38,38 +37,11 @@ sources:
   snippets_count: 0
   associated_entity: REA + Reverse-skill + PentAGI
   incremental_merged: false
-- id: wechat_article_20261026_Opus_5.5，你竟然这样做视频～！
-  title: Opus 5.5，你竟然这样做视频～！
-  type: wechat_article
-  url: https://mp.weixin.qq.com/s/jZwxMX9nWsD0abzrPWe0Ig
-  author: EARS
-  file: sources/20261026_wechat_article_Opus_5.5，你竟然这样做视频～！.md
-  ingested_at: '2026-10-26 20:53:07'
-  keyframes_count: 0
-  snippets_count: 0
-  associated_entity: Claude
-  incremental_merged: false
+sub_category: ai_reverse
+sub_category_name: 逆向工程与代码复刻
 knowledge_matrix:
-- entity_name: Claude
-  domain: general_inbox
-  archetype: general_tech
-  core_function: Claude Opus 5.5是强，我看到很多代码炫酷耍帅的视频。
-  hardware_specs: 标准机器配置 (4G~8G 内存即可无痛运行)
-  environment: Python 3.10+
-  local_deployable: 🟢 本地命令行/独立工具 (无强联网依赖)
-  competitive_advantages:
-  - 模块解耦度高，支持无缝嵌入现有工作流
-  - 输出带证据链追溯，结论可二次核对验证
-  limitations_and_pitfalls:
-  - 依赖外部环境版本一致性，版本漂移可能导致调用失败
-  - 对于超大规模复杂项目，AI 一次性分析可能出现幻觉或切分过粗
-  quickstart_commands: []
-  key_insights: []
-  sources_contributed:
-  - EARS
-  merged_sources_count: 1
 - entity_name: REA + Reverse-skill + PentAGI
-  domain: general_inbox
+  domain: ai_tech
   archetype: reverse_engineering
   core_function: 分析我自己有权分析的软件功能
   hardware_specs: '轻量级要求: 任意主流Mac/PC (8G+内存，无需高配独立显卡)'
