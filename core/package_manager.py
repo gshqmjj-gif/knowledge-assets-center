@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import yaml
 
-from config import DEFAULT_DOMAINS, PACKAGES_DIR
+from config import PRIMARY_DOMAINS, PACKAGES_DIR, resolve_domain
 from crawlers.base import IngestedItem
 
 logger = logging.getLogger("hermes.package_manager")
@@ -53,13 +53,19 @@ class KnowledgePackageManager:
         package_id: str,
         name: str,
         description: str = "",
-        domain: str = "general",
+        domain: str = "general_inbox",
         tags: Optional[List[str]] = None
     ) -> Path:
         """创建一个全新的知识资产包骨架"""
         clean_id = re.sub(r'[^a-zA-Z0-9_\-]', '_', package_id).lower().strip('_')
         pkg_dir = self.packages_dir / clean_id
         
+        # 匹配一级领域体系
+        domain_key = resolve_domain(domain)
+        dom_info = PRIMARY_DOMAINS.get(domain_key, PRIMARY_DOMAINS["general_inbox"])
+        domain_name = dom_info["name"]
+        domain_icon = dom_info.get("icon", "📁")
+
         # 创建目录结构
         (pkg_dir / "sources").mkdir(parents=True, exist_ok=True)
         (pkg_dir / "keyframes").mkdir(parents=True, exist_ok=True)
@@ -69,9 +75,11 @@ class KnowledgePackageManager:
         meta = {
             "id": clean_id,
             "name": name,
-            "description": description or f"{name} 相关技术知识沉淀与工程实践资产包",
-            "domain": domain,
-            "tags": tags or [domain, "技术资产"],
+            "description": description or f"{name} 相关知识沉淀与实战资产包",
+            "domain": domain_key,
+            "domain_name": domain_name,
+            "domain_icon": domain_icon,
+            "tags": tags or [domain_name, "知识资产"],
             "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "item_count": 0,
@@ -83,42 +91,57 @@ class KnowledgePackageManager:
 
         # 初始化 SUMMARY.md 和 AGENT_CONTEXT.md
         self._write_initial_summaries(pkg_dir, meta)
-        logger.info(f"Created knowledge asset package: {clean_id} ({name})")
+        logger.info(f"Created knowledge asset package: {clean_id} ({name}) under domain [{domain_name}]")
         return pkg_dir
 
-    def route_item_to_package(self, item: IngestedItem, preferred_package: Optional[str] = None) -> str:
+    def route_item_to_package(
+        self,
+        item: IngestedItem,
+        preferred_package: Optional[str] = None,
+        preferred_domain: Optional[str] = None
+    ) -> str:
         """
-        智能归类路由：根据文本内容、标题、标签与预设领域关键词，将知识路由到最适合的资产包
+        智能归类路由：根据领域偏好、文本内容、标题、标签与预设领域关键词，将知识路由到最适合的资产包
         """
+        # 1. 用户显式指定了资产包
         if preferred_package:
-            # 用户显式指定
             pkg_id = re.sub(r'[^a-zA-Z0-9_\-]', '_', preferred_package).lower().strip('_')
             if not (self.packages_dir / pkg_id).exists():
-                self.create_package(pkg_id, name=preferred_package, domain="custom")
+                domain_val = preferred_domain or "general_inbox"
+                self.create_package(pkg_id, name=preferred_package, domain=domain_val)
             return pkg_id
 
-        # 1. 扫描现有资产包匹配度
-        existing_packages = self.list_packages()
-        search_blob = f"{item.title} {item.summary} {' '.join(item.tags)} {item.content_markdown[:600]}".lower()
+        # 2. 用户指定了一级领域 (例如 "商业", "AI科技", "建筑", "3D", "产品")
+        if preferred_domain:
+            domain_key = resolve_domain(preferred_domain)
+            dom_info = PRIMARY_DOMAINS.get(domain_key, PRIMARY_DOMAINS["general_inbox"])
+            target_id = dom_info.get("default_package", domain_key)
+            if not (self.packages_dir / target_id).exists():
+                self.create_package(
+                    package_id=target_id,
+                    name=dom_info.get("default_package_name", dom_info["name"]),
+                    description=f"{dom_info['name']} 核心领域知识资产包",
+                    domain=domain_key,
+                    tags=dom_info.get("keywords", [])[:5]
+                )
+            return target_id
 
+        # 3. 自动匹配现有资产包或预置一级领域
+        existing_packages = self.list_packages()
+        search_blob = f"{item.title} {item.summary} {' '.join(item.tags)} {item.content_markdown[:800]}".lower()
+
+        # 优先匹配已有资产包
         best_pkg = None
         best_score = 0
-
         for pkg in existing_packages:
             score = 0
             pkg_name = pkg.get("name", "").lower()
             pkg_tags = [t.lower() for t in pkg.get("tags", [])]
-            pkg_desc = pkg.get("description", "").lower()
-
             if pkg_name in search_blob:
                 score += 5
             for tag in pkg_tags:
                 if tag in search_blob:
                     score += 2
-            for token in pkg.get("id", "").split("_"):
-                if len(token) > 2 and token in search_blob:
-                    score += 2
-
             if score > best_score:
                 best_score = score
                 best_pkg = pkg.get("id")
@@ -126,45 +149,51 @@ class KnowledgePackageManager:
         if best_pkg and best_score >= 4:
             return best_pkg
 
-        # 2. 匹配预置领域
-        for domain_key, info in DEFAULT_DOMAINS.items():
+        # 其次匹配一级领域
+        best_domain = None
+        domain_max_matches = 0
+        for domain_key, info in PRIMARY_DOMAINS.items():
             keywords = info.get("keywords", [])
             matches = sum(1 for kw in keywords if kw.lower() in search_blob)
-            if matches >= 2:
-                target_id = info.get("default_package", domain_key)
-                if not (self.packages_dir / target_id).exists():
-                    self.create_package(
-                        package_id=target_id,
-                        name=info.get("name", target_id),
-                        description=f"涵盖 {', '.join(keywords[:6])} 等技术脉络的专业知识资产包",
-                        domain=domain_key,
-                        tags=keywords[:5]
-                    )
-                return target_id
+            if matches > domain_max_matches:
+                domain_max_matches = matches
+                best_domain = (domain_key, info)
 
-        # 3. 兜底通用资产包
-        fallback_id = "general_tech_inbox"
+        if best_domain and domain_max_matches >= 2:
+            domain_key, info = best_domain
+            target_id = info.get("default_package", domain_key)
+            if not (self.packages_dir / target_id).exists():
+                self.create_package(
+                    package_id=target_id,
+                    name=info.get("default_package_name", info.get("name", target_id)),
+                    description=f"涵盖 {', '.join(info.get('keywords', [])[:6])} 等核心维度的专业知识资产包",
+                    domain=domain_key,
+                    tags=info.get("keywords", [])[:5]
+                )
+            return target_id
+
+        # 兜底通用资产包
+        fallback_id = "general_knowledge_inbox"
         if not (self.packages_dir / fallback_id).exists():
             self.create_package(
                 package_id=fallback_id,
-                name="综合技术收藏与待分类资产",
-                description="新收藏待归档或跨领域的通用技术资产汇总",
-                domain="general",
-                tags=["通用技术", "待归档"]
+                name="通用知识与综合收藏",
+                description="新收藏待归档或跨领域的综合知识资产汇总",
+                domain="general_inbox",
+                tags=["通用知识", "待归档"]
             )
         return fallback_id
 
-    def ingest_item(self, item: IngestedItem, preferred_package: Optional[str] = None) -> Tuple[str, Path]:
+    def ingest_item(
+        self,
+        item: IngestedItem,
+        preferred_package: Optional[str] = None,
+        preferred_domain: Optional[str] = None
+    ) -> Tuple[str, Path]:
         """
         核心方法：将抓取到的数据实体结构化拆分入库到知识资产包
-        1. 路由确定资产包
-        2. 转移关键帧图片、资产图表
-        3. 提炼并保存可复用代码段
-        4. 保存来源文档 Markdown
-        5. 更新 package.yaml 索引
-        6. 重新综合沉淀 SUMMARY.md 与 AGENT_CONTEXT.md
         """
-        pkg_id = self.route_item_to_package(item, preferred_package)
+        pkg_id = self.route_item_to_package(item, preferred_package, preferred_domain)
         pkg_dir = self.packages_dir / pkg_id
 
         sources_dir = pkg_dir / "sources"
