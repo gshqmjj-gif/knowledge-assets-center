@@ -8,16 +8,21 @@ sub_category: ai_video
 sub_category_name: AI视频与多模态创作
 sub_category_icon: 🎬
 tags:
-- 横版
-- GitHub
 - AI视频与多模态创作
-- AI科技与大模型
-- 点阵
-- B站视频
+- skills
+- B站精选
+- REA
+- free-claude-code
+- 横版
+- diagram-design
 - 洛克AI
+- OpenSRE
+- 开源项目
+- OpenMontage
+- AirLLM
 created_at: '2026-10-27 04:26:17'
-updated_at: '2026-10-27 04:26:17'
-item_count: 1
+updated_at: '2026-10-27 04:47:11'
+item_count: 11
 knowledge_matrix:
 - entity_name: '这周 GitHub 上涨星最猛的 10 '
   domain: ai_tech
@@ -45,7 +50,271 @@ knowledge_matrix:
   sources_contributed:
   - 洛克AI
   merged_sources_count: 1
+- entity_name: REA
+  domain: ai_tech
+  archetype: reverse_engineering
+  core_function: 围绕 REA 打造的全自动化逻辑推演与工程实现工作流
+  hardware_specs: ram
+  environment: 跨平台标准环境 (支持 macOS / Linux / Windows)
+  local_deployable: 🟢 本地命令行/独立工具 (无强联网依赖)
+  competitive_advantages:
+  - 【成熟生态】工具链模块解耦度高，支持快速组合并无缝嵌入现有工程流。
+  - 【透明推演】输出具备完整的上下文依据与调用日志，结论可二次逐项核对。
+  - 【干净复刻】基于行为推演重写自主版本，有效规避版权与混淆对抗风险。
+  - 【端到端协同】从目标分析、环境依赖配齐到安全初筛，构建一体化工作流。
+  limitations_and_pitfalls:
+  - 【合规红线】严格限定合法学习或授权复刻，严禁对明确禁止逆向或商业加密混淆做对抗。
+  - 【环境排错】涉及多工具串联，遇到报错应保留完整日志并逐项单点排查，切忌全量同时修改。
+  - 【复刻边界】切忌盲目原样搬运代码或素材；复刻核心在于摸清行为逻辑后独立自研重写。
+  - 【安全界限】自动化工具仅提供初步扫描，业务逻辑漏洞与敏感权限仍需人工专项复核。
+  quickstart_commands: []
+  key_insights: []
+  sources_contributed:
+  - 洛克AI
+  merged_sources_count: 1
+- entity_name: skills：让 AI 先问清楚、再写测
+  domain: ai_tech
+  archetype: creative_multimodal
+  core_function: 围绕 skills：让 AI 先问清楚、再写测 打造的全自动化逻辑推演与工程实现工作流
+  hardware_specs: ram
+  environment: 跨平台标准环境 (支持 macOS / Linux / Windows)
+  local_deployable: 🟢 本地命令行/独立工具 (无强联网依赖)
+  competitive_advantages:
+  - 【成熟生态】工具链模块解耦度高，支持快速组合并无缝嵌入现有工程流。
+  - 【透明推演】输出具备完整的上下文依据与调用日志，结论可二次逐项核对。
+  - 【干净复刻】基于行为推演重写自主版本，有效规避版权与混淆对抗风险。
+  - 【端到端协同】从目标分析、环境依赖配齐到安全初筛，构建一体化工作流。
+  limitations_and_pitfalls:
+  - 【合规红线】严格限定合法学习或授权复刻，严禁对明确禁止逆向或商业加密混淆做对抗。
+  - 【环境排错】涉及多工具串联，遇到报错应保留完整日志并逐项单点排查，切忌全量同时修改。
+  - 【复刻边界】切忌盲目原样搬运代码或素材；复刻核心在于摸清行为逻辑后独立自研重写。
+  - 【安全界限】自动化工具仅提供初步扫描，业务逻辑漏洞与敏感权限仍需人工专项复核。
+  quickstart_commands: []
+  key_insights: []
+  sources_contributed:
+  - 洛克AI
+  merged_sources_count: 3
+- entity_name: 'diagram-design：一句话让 '
+  domain: ai_tech
+  archetype: creative_multimodal
+  core_function: 围绕 diagram-design：一句话让  打造的全自动化逻辑推演与工程实现工作流
+  hardware_specs: ram
+  environment: 跨平台标准环境 (支持 macOS / Linux / Windows)
+  local_deployable: 🟢 本地命令行/独立工具 (无强联网依赖)
+  competitive_advantages:
+  - 【成熟生态】工具链模块解耦度高，支持快速组合并无缝嵌入现有工程流。
+  - 【透明推演】输出具备完整的上下文依据与调用日志，结论可二次逐项核对。
+  - 【干净复刻】基于行为推演重写自主版本，有效规避版权与混淆对抗风险。
+  - 【端到端协同】从目标分析、环境依赖配齐到安全初筛，构建一体化工作流。
+  limitations_and_pitfalls:
+  - 【合规红线】严格限定合法学习或授权复刻，严禁对明确禁止逆向或商业加密混淆做对抗。
+  - 【环境排错】涉及多工具串联，遇到报错应保留完整日志并逐项单点排查，切忌全量同时修改。
+  - 【复刻边界】切忌盲目原样搬运代码或素材；复刻核心在于摸清行为逻辑后独立自研重写。
+  - 【安全界限】自动化工具仅提供初步扫描，业务逻辑漏洞与敏感权限仍需人工专项复核。
+  quickstart_commands: []
+  key_insights: []
+  sources_contributed:
+  - 洛克AI
+  merged_sources_count: 1
+- entity_name: Claude
+  domain: ai_tech
+  archetype: creative_multimodal
+  core_function: 围绕 Claude 打造的全自动化逻辑推演与工程实现工作流
+  hardware_specs: ram
+  environment: 跨平台标准环境 (支持 macOS / Linux / Windows)
+  local_deployable: 🟡 混合架构 (分析/逆向工具本地离线执行，逻辑推演重写依赖 AI 编程助手)
+  competitive_advantages:
+  - 【成熟生态】工具链模块解耦度高，支持快速组合并无缝嵌入现有工程流。
+  - 【透明推演】输出具备完整的上下文依据与调用日志，结论可二次逐项核对。
+  - 【干净复刻】基于行为推演重写自主版本，有效规避版权与混淆对抗风险。
+  - 【端到端协同】从目标分析、环境依赖配齐到安全初筛，构建一体化工作流。
+  limitations_and_pitfalls:
+  - 【合规红线】严格限定合法学习或授权复刻，严禁对明确禁止逆向或商业加密混淆做对抗。
+  - 【环境排错】涉及多工具串联，遇到报错应保留完整日志并逐项单点排查，切忌全量同时修改。
+  - 【复刻边界】切忌盲目原样搬运代码或素材；复刻核心在于摸清行为逻辑后独立自研重写。
+  - 【安全界限】自动化工具仅提供初步扫描，业务逻辑漏洞与敏感权限仍需人工专项复核。
+  quickstart_commands: []
+  key_insights: []
+  sources_contributed:
+  - 洛克AI
+  merged_sources_count: 2
+- entity_name: knowledge-work-plugi
+  domain: ai_tech
+  archetype: creative_multimodal
+  core_function: 围绕 knowledge-work-plugi 打造的全自动化逻辑推演与工程实现工作流
+  hardware_specs: ram
+  environment: 跨平台标准环境 (支持 macOS / Linux / Windows)
+  local_deployable: 🟢 本地命令行/独立工具 (无强联网依赖)
+  competitive_advantages:
+  - 【成熟生态】工具链模块解耦度高，支持快速组合并无缝嵌入现有工程流。
+  - 【透明推演】输出具备完整的上下文依据与调用日志，结论可二次逐项核对。
+  - 【干净复刻】基于行为推演重写自主版本，有效规避版权与混淆对抗风险。
+  - 【端到端协同】从目标分析、环境依赖配齐到安全初筛，构建一体化工作流。
+  limitations_and_pitfalls:
+  - 【合规红线】严格限定合法学习或授权复刻，严禁对明确禁止逆向或商业加密混淆做对抗。
+  - 【环境排错】涉及多工具串联，遇到报错应保留完整日志并逐项单点排查，切忌全量同时修改。
+  - 【复刻边界】切忌盲目原样搬运代码或素材；复刻核心在于摸清行为逻辑后独立自研重写。
+  - 【安全界限】自动化工具仅提供初步扫描，业务逻辑漏洞与敏感权限仍需人工专项复核。
+  quickstart_commands: []
+  key_insights: []
+  sources_contributed:
+  - 洛克AI
+  merged_sources_count: 1
+- entity_name: AirLLM：4GB 显卡跑 70B 大
+  domain: ai_tech
+  archetype: creative_multimodal
+  core_function: 围绕 AirLLM：4GB 显卡跑 70B 大 打造的全自动化逻辑推演与工程实现工作流
+  hardware_specs: ram
+  environment: 跨平台标准环境 (支持 macOS / Linux / Windows)
+  local_deployable: 🟢 本地命令行/独立工具 (无强联网依赖)
+  competitive_advantages:
+  - 【成熟生态】工具链模块解耦度高，支持快速组合并无缝嵌入现有工程流。
+  - 【透明推演】输出具备完整的上下文依据与调用日志，结论可二次逐项核对。
+  - 【干净复刻】基于行为推演重写自主版本，有效规避版权与混淆对抗风险。
+  - 【端到端协同】从目标分析、环境依赖配齐到安全初筛，构建一体化工作流。
+  limitations_and_pitfalls:
+  - 【合规红线】严格限定合法学习或授权复刻，严禁对明确禁止逆向或商业加密混淆做对抗。
+  - 【环境排错】涉及多工具串联，遇到报错应保留完整日志并逐项单点排查，切忌全量同时修改。
+  - 【复刻边界】切忌盲目原样搬运代码或素材；复刻核心在于摸清行为逻辑后独立自研重写。
+  - 【安全界限】自动化工具仅提供初步扫描，业务逻辑漏洞与敏感权限仍需人工专项复核。
+  quickstart_commands: []
+  key_insights: []
+  sources_contributed:
+  - 洛克AI
+  merged_sources_count: 1
+- entity_name: text-to-cad：一句话生成能加工
+  domain: ai_tech
+  archetype: creative_multimodal
+  core_function: 围绕 text-to-cad：一句话生成能加工 打造的全自动化逻辑推演与工程实现工作流
+  hardware_specs: ram
+  environment: 跨平台标准环境 (支持 macOS / Linux / Windows)
+  local_deployable: 🟢 本地命令行/独立工具 (无强联网依赖)
+  competitive_advantages:
+  - 【成熟生态】工具链模块解耦度高，支持快速组合并无缝嵌入现有工程流。
+  - 【透明推演】输出具备完整的上下文依据与调用日志，结论可二次逐项核对。
+  - 【干净复刻】基于行为推演重写自主版本，有效规避版权与混淆对抗风险。
+  - 【端到端协同】从目标分析、环境依赖配齐到安全初筛，构建一体化工作流。
+  limitations_and_pitfalls:
+  - 【合规红线】严格限定合法学习或授权复刻，严禁对明确禁止逆向或商业加密混淆做对抗。
+  - 【环境排错】涉及多工具串联，遇到报错应保留完整日志并逐项单点排查，切忌全量同时修改。
+  - 【复刻边界】切忌盲目原样搬运代码或素材；复刻核心在于摸清行为逻辑后独立自研重写。
+  - 【安全界限】自动化工具仅提供初步扫描，业务逻辑漏洞与敏感权限仍需人工专项复核。
+  quickstart_commands: []
+  key_insights: []
+  sources_contributed:
+  - 洛克AI
+  merged_sources_count: 1
 sources:
+- id: bilibili_video_20261027_OpenSRE：让_AI_帮你排查线上故障
+  title: OpenSRE：让 AI 帮你排查线上故障
+  type: bilibili_video
+  url: https://www.bilibili.com/video/BV1UAn36aEX3?t=568
+  author: 洛克AI
+  file: sources/20261027_bilibili_video_OpenSRE：让_AI_帮你排查线上故障.md
+  ingested_at: '2026-10-27 04:47:11'
+  keyframes_count: 1
+  snippets_count: 1
+  associated_entity: skills：让 AI 先问清楚、再写测
+  incremental_merged: true
+- id: bilibili_video_20261027_text-to-cad：一句话生成能加工的_3D_零件
+  title: text-to-cad：一句话生成能加工的 3D 零件
+  type: bilibili_video
+  url: https://www.bilibili.com/video/BV1UAn36aEX3?t=513
+  author: 洛克AI
+  file: sources/20261027_bilibili_video_text-to-cad：一句话生成能加工的_3D_零件.md
+  ingested_at: '2026-10-27 04:46:53'
+  keyframes_count: 1
+  snippets_count: 1
+  associated_entity: text-to-cad：一句话生成能加工
+  incremental_merged: false
+- id: bilibili_video_20261027_AirLLM：4GB_显卡跑_70B_大模型
+  title: AirLLM：4GB 显卡跑 70B 大模型
+  type: bilibili_video
+  url: https://www.bilibili.com/video/BV1UAn36aEX3?t=449
+  author: 洛克AI
+  file: sources/20261027_bilibili_video_AirLLM：4GB_显卡跑_70B_大模型.md
+  ingested_at: '2026-10-27 04:46:35'
+  keyframes_count: 1
+  snippets_count: 1
+  associated_entity: AirLLM：4GB 显卡跑 70B 大
+  incremental_merged: false
+- id: bilibili_video_20261027_knowledge-work-plugins：Anthropic_官方出的_11_个岗位插件
+  title: knowledge-work-plugins：Anthropic 官方出的 11 个岗位插件
+  type: bilibili_video
+  url: https://www.bilibili.com/video/BV1UAn36aEX3?t=389
+  author: 洛克AI
+  file: sources/20261027_bilibili_video_knowledge-work-plugins：Anthropic_官方出的_11_个岗位插件.md
+  ingested_at: '2026-10-27 04:46:17'
+  keyframes_count: 1
+  snippets_count: 1
+  associated_entity: knowledge-work-plugi
+  incremental_merged: false
+- id: bilibili_video_20261027_free-claude-code：用免费额度跑_Claude_Code_这类编程工具
+  title: free-claude-code：用免费额度跑 Claude Code 这类编程工具
+  type: bilibili_video
+  url: https://www.bilibili.com/video/BV1UAn36aEX3?t=329
+  author: 洛克AI
+  file: sources/20261027_bilibili_video_free-claude-code：用免费额度跑_Claude_Code_这类编程工具.md
+  ingested_at: '2026-10-27 04:46:06'
+  keyframes_count: 1
+  snippets_count: 1
+  associated_entity: Claude
+  incremental_merged: true
+- id: bilibili_video_20261027_claude-mem：给_AI_加上跨对话的长期记忆
+  title: claude-mem：给 AI 加上跨对话的长期记忆
+  type: bilibili_video
+  url: https://www.bilibili.com/video/BV1UAn36aEX3?t=278
+  author: 洛克AI
+  file: sources/20261027_bilibili_video_claude-mem：给_AI_加上跨对话的长期记忆.md
+  ingested_at: '2026-10-27 04:45:53'
+  keyframes_count: 1
+  snippets_count: 1
+  associated_entity: Claude
+  incremental_merged: false
+- id: bilibili_video_20261027_OpenMontage：把_AI_编程助手变成视频工作室
+  title: OpenMontage：把 AI 编程助手变成视频工作室
+  type: bilibili_video
+  url: https://www.bilibili.com/video/BV1UAn36aEX3?t=219
+  author: 洛克AI
+  file: sources/20261027_bilibili_video_OpenMontage：把_AI_编程助手变成视频工作室.md
+  ingested_at: '2026-10-27 04:45:41'
+  keyframes_count: 1
+  snippets_count: 1
+  associated_entity: skills：让 AI 先问清楚、再写测
+  incremental_merged: true
+- id: bilibili_video_20261027_diagram-design：一句话让_AI_画出专业图解
+  title: diagram-design：一句话让 AI 画出专业图解
+  type: bilibili_video
+  url: https://www.bilibili.com/video/BV1UAn36aEX3?t=162
+  author: 洛克AI
+  file: sources/20261027_bilibili_video_diagram-design：一句话让_AI_画出专业图解.md
+  ingested_at: '2026-10-27 04:45:28'
+  keyframes_count: 1
+  snippets_count: 1
+  associated_entity: 'diagram-design：一句话让 '
+  incremental_merged: false
+- id: bilibili_video_20261027_skills：让_AI_先问清楚、再写测试的编程技能包
+  title: skills：让 AI 先问清楚、再写测试的编程技能包
+  type: bilibili_video
+  url: https://www.bilibili.com/video/BV1UAn36aEX3?t=101
+  author: 洛克AI
+  file: sources/20261027_bilibili_video_skills：让_AI_先问清楚、再写测试的编程技能包.md
+  ingested_at: '2026-10-27 04:45:14'
+  keyframes_count: 1
+  snippets_count: 1
+  associated_entity: skills：让 AI 先问清楚、再写测
+  incremental_merged: false
+- id: bilibili_video_20261027_REA：让_AI_逆向任何_App，一直拆到二进制
+  title: REA：让 AI 逆向任何 App，一直拆到二进制
+  type: bilibili_video
+  url: https://www.bilibili.com/video/BV1UAn36aEX3?t=35
+  author: 洛克AI
+  file: sources/20261027_bilibili_video_REA：让_AI_逆向任何_App，一直拆到二进制.md
+  ingested_at: '2026-10-27 04:45:06'
+  keyframes_count: 1
+  snippets_count: 1
+  associated_entity: REA
+  incremental_merged: false
 - id: bilibili_video_20261027_这周_GitHub_上涨星最猛的_10_个_AI_开源项目
   title: 这周 GitHub 上涨星最猛的 10 个 AI 开源项目
   type: bilibili_video

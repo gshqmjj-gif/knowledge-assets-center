@@ -27,6 +27,7 @@ class IngestedItem:
     keyframes: List[str] = field(default_factory=list)      # 关键帧相对路径或名称
     code_snippets: List[Dict[str, str]] = field(default_factory=list) # 代码段集合
     assets: List[str] = field(default_factory=list)         # 关联图片或图表
+    sub_items: List[Any] = field(default_factory=list)      # 拆解后的原子子项 (用于多项目/多章节聚合视频或文章)
     metadata: Dict[str, Any] = field(default_factory=dict)
     ingested_at: str = field(default_factory=lambda: datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 

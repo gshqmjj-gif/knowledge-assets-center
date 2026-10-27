@@ -140,6 +140,8 @@ def ingest_api(req: IngestRequest):
         commit_hash = git_mgr.commit(f"feat(kb): ingest [{item.source_type}] {item.title[:40]} into package '{pkg_id}'")
 
         pkg_meta = pm.get_package(pkg_id) or {}
+        packages_affected = item.metadata.get("packages_affected", [pkg_id])
+        sub_items_count = len(getattr(item, "sub_items", []))
 
         return {
             "success": True,
@@ -154,6 +156,9 @@ def ingest_api(req: IngestRequest):
             "source_file": source_path.name,
             "keyframes_count": len(item.keyframes),
             "snippets_count": len(item.code_snippets),
+            "decomposed": sub_items_count >= 2,
+            "sub_items_count": sub_items_count,
+            "packages_affected": packages_affected,
             "commit": commit_hash
         }
     except Exception as e:
@@ -992,9 +997,14 @@ HTML_DASHBOARD = r"""
         const data = await res.json();
         if (data.success) {
           statusDiv.className = 'mt-2 text-xs text-emerald-400 block';
-          statusDiv.innerText = `成功录入《${data.title}》！归入 [${data.domain_icon || '📁'} ${data.domain_name} > ${data.sub_category_name || '专题'}]，Git: ${data.commit || 'ok'}`;
+          if (data.decomposed) {
+            statusDiv.innerText = `成功原子化拆解《${data.title}》为 ${data.sub_items_count} 个独立项目实体，并已按领域多路定向归纳至对应资产包！Git: ${data.commit || 'ok'}`;
+            showToast(`成功拆解 ${data.sub_items_count} 个技术项目并精准归包！`);
+          } else {
+            statusDiv.innerText = `成功录入《${data.title}》！归入 [${data.domain_icon || '📁'} ${data.domain_name} > ${data.sub_category_name || '专题'}]，Git: ${data.commit || 'ok'}`;
+            showToast(`成功沉淀《${data.title.slice(0, 20)}...》至资产包！`);
+          }
           urlInput.value = '';
-          showToast(`成功沉淀《${data.title.slice(0, 20)}...》至资产包！`);
           await loadTaxonomy();
           await loadPackages();
           selectPackage(data.package_id);

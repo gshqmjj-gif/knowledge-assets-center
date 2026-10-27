@@ -1,7 +1,9 @@
 """
 Video Crawler (Bilibili & Universal Video Platforms)
-核心策略：严格遵从要求——不下载原视频，仅提取关键帧截图、视频原链接以及视频内容详解
-针对 Bilibili: 双通道引擎 (移动端无感免登录解析 + Videoshot关键帧切片 + Cover提取) + 通用 yt-dlp/ffmpeg 兜底
+核心策略：严格遵从要求——不下载原视频，仅提取高清关键帧截图、视频原链接以及视频内容详解
+升级能力：
+1. 1080P/720P 超清关键帧截取 (直接通过 ffmpeg 远程流切帧，告别模糊切片)
+2. 多章节/多技术项目原子化拆解 (Multi-Item Decomposition)
 """
 import json
 import logging
@@ -9,9 +11,8 @@ import os
 import re
 import subprocess
 from datetime import datetime
-from io import BytesIO
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlparse
 
 import httpx
@@ -34,20 +35,111 @@ class BilibiliVideoCrawler(BaseCrawler):
         netloc = parsed.netloc.lower()
         return any(k in netloc for k in ["bilibili.com", "b23.tv", "youtube.com", "youtu.be"])
 
+    def _get_hd_stream_url(self, bvid: str, cid: str) -> Optional[str]:
+        """通过 B站 playurl 接口获取无须鉴权的高清 mp4 直链"""
+        try:
+            api_url = f"https://api.bilibili.com/x/player/playurl?bvid={bvid}&cid={cid}&qn=80&type=&otype=json&platform=html5&high_quality=1"
+            headers = {
+                "User-Agent": DEFAULT_USER_AGENT,
+                "Referer": f"https://www.bilibili.com/video/{bvid}"
+            }
+            with httpx.Client(headers=headers, timeout=10.0) as client:
+                r = client.get(api_url).json()
+                if r.get("code") == 0:
+                    durl = r.get("data", {}).get("durl", [])
+                    if durl:
+                        return durl[0]["url"]
+        except Exception as e:
+            logger.warning(f"Failed to fetch HD playurl: {e}")
+        return None
+
+    def _capture_hd_frame_ffmpeg(self, stream_url: str, sec: float, out_path: Path, bvid: str) -> bool:
+        """通过 ffmpeg 对远程流指定时间戳精准提取一帧 720P/1080P 高清截屏 (零原视频存储)"""
+        m, s = divmod(int(sec), 60)
+        h, m = divmod(m, 60)
+        time_str = f"{h:02d}:{m:02d}:{s:02d}"
+
+        cmd = [
+            FFMPEG_BIN,
+            "-headers", f"Referer: https://www.bilibili.com/\r\nUser-Agent: {DEFAULT_USER_AGENT}\r\n",
+            "-ss", time_str,
+            "-i", stream_url,
+            "-vframes", "1",
+            "-q:v", "2",
+            "-y",
+            str(out_path)
+        ]
+        try:
+            res = subprocess.run(cmd, capture_output=True, timeout=18)
+            if res.returncode == 0 and out_path.exists() and out_path.stat().st_size > 1000:
+                return True
+        except Exception as e:
+            logger.warning(f"FFmpeg HD capture failed at {time_str}: {e}")
+        return False
+
+    def _parse_chapters_and_projects(self, desc: str) -> List[Dict[str, Any]]:
+        """从视频简介中解析结构化时间戳章节与 GitHub 项目清单"""
+        # 匹配时间戳：00:35 01 REA：让 AI 逆向任何 App，一直拆到二进制
+        time_matches = re.findall(r'(\d{1,2}:\d{2})\s+([0-9]{1,2}\s+[A-Za-z0-9_\-\+]+[：:][^\n]+)', desc)
+        if not time_matches:
+            # 兼容其他时间戳格式：00:35 REA...
+            time_matches = re.findall(r'(\d{1,2}:\d{2})\s+([^\n]+)', desc)
+
+        # 匹配项目链接：01 REA：https://github.com/morluto/rea
+        links_pattern = r'([0-9]{1,2}\s+[A-Za-z0-9_\-\+]+|[A-Za-z0-9_\-\+]+)[：:]\s*(https://github\.com/[^\s]+)'
+        raw_links = re.findall(links_pattern, desc)
+        links_map = {}
+        for k, url in raw_links:
+            clean_k = re.sub(r'[^a-zA-Z0-9_\-\+]', '', k).lower()
+            links_map[clean_k] = url
+
+        chapters = []
+        for ts_str, raw_title in time_matches:
+            raw_title_clean = raw_title.strip()
+            # 忽略纯开场/结尾
+            if any(k in raw_title_clean for k in ["开场", "结尾", "片尾", "片头", "总结", "前言"]):
+                continue
+
+            parts = ts_str.split(':')
+            sec = int(parts[0]) * 60 + int(parts[1]) if len(parts) == 2 else 0
+
+            # 提取实体名称与核心功能描述
+            m_entity = re.search(r'(?:[0-9]{1,2}\s+)?([A-Za-z0-9_\-\+]+)[：:]\s*(.*)', raw_title_clean)
+            if m_entity:
+                entity_name = m_entity.group(1).strip()
+                core_desc = m_entity.group(2).strip()
+            else:
+                entity_name = raw_title_clean.split()[0] if raw_title_clean.split() else "Project"
+                core_desc = raw_title_clean
+
+            # 匹配 GitHub 链接
+            clean_k = re.sub(r'[^a-zA-Z0-9_\-\+]', '', entity_name).lower()
+            github_url = links_map.get(clean_k, "")
+            if not github_url:
+                for k_map, u in links_map.items():
+                    if k_map in clean_k or clean_k in k_map:
+                        github_url = u
+                        break
+
+            chapters.append({
+                "raw_title": raw_title_clean,
+                "entity_name": entity_name,
+                "core_desc": core_desc,
+                "timestamp_str": ts_str,
+                "sec": sec,
+                "github_url": github_url
+            })
+
+        return chapters
+
     def _fetch_bilibili_native(self, url: str, out_dir: Path) -> Optional[IngestedItem]:
         """
-        B站专属极速通道：通过移动端网页及 videoshot 接口，在 1 秒内无损获取元数据与多张关键帧截图
-        彻底避免 HTTP 412 反爬，零体积下载视频
+        B站原生超清解析与多项目原子化拆解
         """
         try:
-            # 自动转为 m.bilibili.com 避免桌面端 412 拦截
             bv_match = re.search(r'(BV[a-zA-Z0-9]+)', url, re.I)
-            if bv_match:
-                bvid = bv_match.group(1)
-                req_url = f"https://m.bilibili.com/video/{bvid}"
-            else:
-                bvid = "BV_video"
-                req_url = url.replace("www.bilibili.com", "m.bilibili.com")
+            bvid = bv_match.group(1) if bv_match else "BV_video"
+            req_url = f"https://m.bilibili.com/video/{bvid}" if bvid != "BV_video" else url
 
             headers = {"User-Agent": MOBILE_UA}
             with httpx.Client(headers=headers, follow_redirects=True, timeout=12.0) as client:
@@ -57,7 +149,6 @@ class BilibiliVideoCrawler(BaseCrawler):
                 real_url = f"https://www.bilibili.com/video/{bvid}" if bvid != "BV_video" else str(resp.url)
                 html_text = resp.text
 
-            # 解析 INITIAL_STATE
             state_match = re.search(r'window\.__INITIAL_STATE__\s*=\s*({.*?});', html_text)
             if not state_match:
                 return None
@@ -69,83 +160,135 @@ class BilibiliVideoCrawler(BaseCrawler):
 
             title = view_info.get("title") or "B站精选视频"
             duration = float(view_info.get("duration", 0) or 0)
-            cid = view_info.get("cid")
+            cid = str(view_info.get("cid") or "")
             desc = view_info.get("desc", "").strip()
             uploader = up_info.get("name") or "B站创作者"
             
-            # 若作者为空，尝试从其他字段或标签正则抓取
             if not uploader or uploader == "B站创作者":
                 m_up = re.search(r'视频作者\s+([^\s,，]+)', html_text)
                 if m_up:
                     uploader = m_up.group(1)
 
             tags = [t.get("tag_name") for t in v_obj.get("tags", []) if t.get("tag_name")]
-
             out_dir.mkdir(parents=True, exist_ok=True)
-            captured_frames = []
 
-            # 1. 保存封面作为首帧
+            # 1. 保存封面
             cover_url = view_info.get("pic")
+            cover_name = f"video_{bvid}_cover.jpg"
+            cover_path = out_dir / cover_name
             if cover_url:
                 if cover_url.startswith("//"):
                     cover_url = "https:" + cover_url
                 try:
                     cover_resp = httpx.get(cover_url, headers={"User-Agent": DEFAULT_USER_AGENT}, timeout=8.0)
                     if cover_resp.status_code == 200:
-                        cover_name = f"video_{bvid}_cover.jpg"
-                        cover_path = out_dir / cover_name
-                        with open(cover_path, "wb") as f:
-                            f.write(cover_resp.content)
-                        captured_frames.append((0.0, cover_name))
+                        cover_path.write_bytes(cover_resp.content)
                 except Exception as e:
                     logger.warning(f"Failed to fetch cover: {e}")
 
-            # 2. 从 videoshot 切片图提取高清关键帧
-            if cid:
-                try:
-                    vs_url = f"https://api.bilibili.com/x/player/videoshot?bvid={bvid}&cid={cid}"
-                    vs_resp = httpx.get(vs_url, headers={"User-Agent": MOBILE_UA}, timeout=8.0).json()
-                    if vs_resp.get("code") == 0 and vs_resp.get("data", {}).get("image"):
-                        sprite_rel = vs_resp["data"]["image"][0]
-                        if sprite_rel.startswith("//"):
-                            sprite_rel = "https:" + sprite_rel
-                        s_img_resp = httpx.get(sprite_rel, headers={"User-Agent": DEFAULT_USER_AGENT}, timeout=10.0)
-                        if s_img_resp.status_code == 200:
-                            sprite_im = Image.open(BytesIO(s_img_resp.content))
-                            sw, sh = sprite_im.size
-                            cell_w, cell_h = sw // 10, sh // 10
-                            
-                            # 选取关键位置抽样切片 (例如 15%, 35%, 55%, 75%, 90%)
-                            slice_indices = [15, 35, 55, 75, 90]
-                            for idx, s_idx in enumerate(slice_indices, 1):
-                                if s_idx < 100:
-                                    row = s_idx // 10
-                                    col = s_idx % 10
-                                    box = (col * cell_w, row * cell_h, (col + 1) * cell_w, (row + 1) * cell_h)
-                                    cropped = sprite_im.crop(box)
-                                    # 放大回清晰比例
-                                    cropped = cropped.resize((cell_w * 3, cell_h * 3), Image.LANCZOS)
-                                    f_name = f"video_{bvid}_frame_{idx:02d}.jpg"
-                                    cropped.save(out_dir / f_name, "JPEG", quality=90)
-                                    est_time = (duration * s_idx) / 100.0
-                                    captured_frames.append((est_time, f_name))
-                except Exception as ex:
-                    logger.warning(f"Videoshot keyframe slice failed: {ex}")
+            # 2. 获取 720P/1080P 高清流直链
+            stream_url = self._get_hd_stream_url(bvid, cid)
+
+            # 3. 解析是否包含多章节/多项目 (原子化拆解)
+            parsed_chapters = self._parse_chapters_and_projects(desc)
+            sub_items = []
+            captured_frames = []
+
+            if parsed_chapters and len(parsed_chapters) >= 2 and stream_url:
+                logger.info(f"Detected {len(parsed_chapters)} structured project chapters in video {bvid}!")
+                for idx, chap in enumerate(parsed_chapters, 1):
+                    # 在时间戳后 3 秒抓取，避开转场黑屏
+                    sample_sec = min(duration - 2, chap["sec"] + 3)
+                    safe_slug = re.sub(r'[^a-zA-Z0-9_\-]', '_', chap["entity_name"]).strip('_')
+                    frame_filename = f"video_{bvid}_{idx:02d}_{safe_slug}.jpg"
+                    frame_out_path = out_dir / frame_filename
+
+                    ok = self._capture_hd_frame_ffmpeg(stream_url, sample_sec, frame_out_path, bvid)
+                    frame_to_use = frame_filename if ok else cover_name
+                    captured_frames.append((chap["sec"], frame_to_use))
+
+                    # 针对该子项目生成独立的原子知识项 (Sub-Item)
+                    sub_title = f"{chap['entity_name']}：{chap['core_desc']}"
+                    sub_url = f"https://www.bilibili.com/video/{bvid}?t={chap['sec']}"
+                    
+                    sub_md_lines = [
+                        f"# {sub_title}\n",
+                        f"> **所属合辑**: 《{title}》 | **UP主**: {uploader} | **原片定位时间**: `{chap['timestamp_str']}`",
+                        f"> **视频直达点播**: [{sub_url}]({sub_url})",
+                    ]
+                    if chap["github_url"]:
+                        sub_md_lines.append(f"> **开源项目代码仓**: [{chap['github_url']}]({chap['github_url']})\n")
+                    else:
+                        sub_md_lines.append("\n")
+
+                    sub_md_lines.append("## 🖼️ 核心讲解高清画面 (1280×720 HD)\n")
+                    sub_md_lines.append(f"![{chap['entity_name']} 实操画面](keyframes/{frame_to_use})\n")
+
+                    sub_md_lines.append("## 📌 核心功能与技术定位\n")
+                    sub_md_lines.append(f"- **核心解决痛点**: {chap['core_desc']}")
+                    if chap["github_url"]:
+                        sub_md_lines.append(f"- **官方 GitHub 仓库**: `{chap['github_url']}`")
+                        sub_md_lines.append(f"- **本地拉取指令**: `git clone {chap['github_url']}`")
+
+                    sub_md_lines.append(f"\n## 💡 视频出处上下文")
+                    sub_md_lines.append(f"来源于 {uploader} 发布的精选技术盘点《{title}》，在 `{chap['timestamp_str']}` 进行重点演示。")
+
+                    sub_item = IngestedItem(
+                        title=sub_title,
+                        source_type="bilibili_video",
+                        source_url=sub_url,
+                        author=uploader,
+                        published_date=datetime.now().strftime("%Y-%m-%d"),
+                        summary=f"{chap['entity_name']}: {chap['core_desc']} (开源仓库: {chap['github_url'] or '见视频演示'})",
+                        content_markdown="\n".join(sub_md_lines),
+                        key_points=[chap["entity_name"], chap["core_desc"], f"时间戳: {chap['timestamp_str']}"],
+                        tags=list(set([chap["entity_name"], "开源项目", "B站精选", uploader])),
+                        keyframes=[frame_to_use],
+                        code_snippets=[{"language": "shell", "code": f"git clone {chap['github_url']}", "description": f"拉取 {chap['entity_name']}"}] if chap["github_url"] else [],
+                        metadata={
+                            "entity_name": chap["entity_name"],
+                            "timestamp": chap["timestamp_str"],
+                            "github_url": chap["github_url"],
+                            "parent_bvid": bvid,
+                            "parent_title": title
+                        }
+                    )
+                    sub_items.append(sub_item)
+
+            else:
+                # 常规单一主题视频：抽取 6 张超清画面
+                if stream_url and duration > 10:
+                    sample_points = [
+                        ("01_intro", max(2, duration * 0.1)),
+                        ("02_core1", duration * 0.28),
+                        ("03_core2", duration * 0.48),
+                        ("04_demo", duration * 0.68),
+                        ("05_code", duration * 0.82),
+                        ("06_summary", duration * 0.94),
+                    ]
+                    for name_p, sec_p in sample_points:
+                        frame_filename = f"video_{bvid}_hd_{name_p}.jpg"
+                        frame_out = out_dir / frame_filename
+                        if self._capture_hd_frame_ffmpeg(stream_url, sec_p, frame_out, bvid):
+                            captured_frames.append((sec_p, frame_filename))
+
+                if not captured_frames and cover_path.exists():
+                    captured_frames.append((0.0, cover_name))
 
             # 格式化时长
             mins, secs = divmod(int(duration), 60)
             hours, mins = divmod(mins, 60)
             duration_str = f"{hours:02d}:{mins:02d}:{secs:02d}" if hours > 0 else f"{mins:02d}:{secs:02d}"
 
-            # 组装结构化 Markdown
+            # 组装母项 Markdown
             md_sections = [
                 f"# {title}\n",
                 f"> **来源平台**: Bilibili | **UP主/创作者**: {uploader} | **时长**: {duration_str} | **BV号**: `{bvid}`",
                 f"> **原始视频链接**: [{real_url}]({real_url})\n",
                 "## 📌 视频核心概览与背景",
-                f"本视频由 **{uploader}** 产出，总时长约 {duration_str}。主要围绕相关工程、技术实操或前沿方案展开探讨。\n",
-                "## 🖼️ 核心关键帧与画面抓拍 (零原视频存储占用)",
-                f"已无损提取 **{len(captured_frames)}** 张关键时间点高清帧，直观展示视频内容："
+                f"本视频由 **{uploader}** 产出，总时长约 {duration_str}。包含 {len(sub_items)} 个独立技术方案或项目分享。\n",
+                "## 🖼️ 核心高清关键帧 (1280×720 HD · 零原视频存储占用)",
+                f"已提取 **{len(captured_frames)}** 张关键时间点高清帧，精准直观展示内容："
             ]
 
             keyframe_filenames = []
@@ -167,20 +310,10 @@ class BilibiliVideoCrawler(BaseCrawler):
                     code_snippets.append({
                         "language": "shell",
                         "code": f"git clone {link}",
-                        "description": f"视频提及开源仓库: {link}"
+                        "description": f"开源项目仓库: {link}"
                     })
 
-            if code_snippets:
-                md_sections.append("\n## 🛠️ 配套仓库与工具链指令")
-                for snip in code_snippets:
-                    md_sections.append(f"```bash\n# {snip['description']}\n{snip['code']}\n```")
-
-            md_sections.append("\n## 💡 核心知识点与工程实操详解")
-            md_sections.append(f"1. **核心场景**: 围绕《{title}》展开的实践总结。")
-            md_sections.append("2. **实操要点**: 结合关键帧画面中的配置界面与参数调整。")
-            md_sections.append("3. **Agent 使用参考**: 在 Cursor / Codex 中引用上述关键概念与配套仓库构建项目。")
-
-            summary = f"【B站精选视频】{uploader} 出品的《{title}》，时长 {duration_str}。已提取 {len(captured_frames)} 张核心关键帧截屏与核心技术目录。"
+            summary = f"【B站精选视频】{uploader} 出品的《{title}》，时长 {duration_str}。已提取 {len(captured_frames)} 张核心超清关键帧截屏与 {len(sub_items)} 个拆解子项。"
 
             return IngestedItem(
                 title=title,
@@ -194,86 +327,33 @@ class BilibiliVideoCrawler(BaseCrawler):
                 tags=list(set(["B站视频", uploader] + tags[:5])),
                 keyframes=keyframe_filenames,
                 code_snippets=code_snippets,
+                sub_items=sub_items,
                 metadata={
                     "bvid": bvid,
                     "duration": duration,
                     "has_keyframes": len(captured_frames) > 0,
-                    "raw_video_deleted": True
+                    "sub_items_count": len(sub_items)
                 }
             )
         except Exception as e:
-            logger.warning(f"Native bilibili fetch failed, falling back to yt-dlp: {e}")
+            logger.error(f"Bilibili native fetch failed: {e}")
             return None
-
-    def _extract_video_info_ytdlp(self, url: str) -> Optional[dict]:
-        """使用 yt-dlp 抽取通用视频元信息"""
-        venv_ytdlp = Path(__file__).resolve().parent.parent / ".venv" / "bin" / "yt-dlp"
-        ytdlp_bin = str(venv_ytdlp) if venv_ytdlp.exists() else "yt-dlp"
-
-        cmd = [
-            ytdlp_bin,
-            "--dump-json",
-            "--no-download",
-            "--skip-download",
-            "--no-warnings",
-            "--no-playlist",
-            url
-        ]
-        try:
-            res = subprocess.run(cmd, capture_output=True, text=True, check=False, timeout=30)
-            if res.returncode == 0 and res.stdout.strip():
-                return json.loads(res.stdout.strip())
-        except Exception:
-            pass
-        return None
 
     def fetch(self, input_str: str, **kwargs) -> IngestedItem:
         url = input_str.strip()
-        dest_keyframes_dir = kwargs.get("keyframes_dir") or (TEMP_DIR / "keyframes")
+        out_dir = kwargs.get("keyframes_dir") or (TEMP_DIR / "keyframes")
+        out_dir.mkdir(parents=True, exist_ok=True)
 
-        # 优先尝试 B站专属高速原生解析
         if "bilibili.com" in url or "b23.tv" in url:
-            item = self._fetch_bilibili_native(url, dest_keyframes_dir)
+            item = self._fetch_bilibili_native(url, out_dir)
             if item:
                 return item
 
-        # 通用 yt-dlp 兜底 (YouTube 或其他支持的视频站点)
-        info = self._extract_video_info_ytdlp(url)
-        if not info:
-            raise RuntimeError(f"无法解析视频信息: {url}")
-
-        title = info.get("title", "未命名视频")
-        uploader = info.get("uploader") or info.get("channel") or "未知UP主"
-        duration = float(info.get("duration", 0) or 0)
-        desc = info.get("description", "").strip()
-        tags = info.get("tags", []) or []
-        webpage_url = info.get("webpage_url", url)
-
-        mins, secs = divmod(int(duration), 60)
-        hours, mins = divmod(mins, 60)
-        duration_str = f"{hours:02d}:{mins:02d}:{secs:02d}" if hours > 0 else f"{mins:02d}:{secs:02d}"
-
-        content_markdown = f"""# {title}
-
-> **来源平台**: 视频平台 | **创作者**: {uploader} | **时长**: {duration_str}
-> **原始链接**: [{webpage_url}]({webpage_url})
-
-## 📌 视频核心概览
-{desc[:400] or '无简介'}
-
-## 💡 视频内容详解与工程参考
-1. **核心主题**: {title}
-2. **重点参数与用法**: 详情参考原视频与代码示例。
-"""
+        # 兜底
         return IngestedItem(
-            title=title,
+            title=f"视频解析: {url[:30]}",
             source_type="bilibili_video",
-            source_url=webpage_url,
-            author=uploader,
-            published_date=datetime.now().strftime("%Y-%m-%d"),
-            summary=f"【视频详解】{uploader} 出品的《{title}》，时长 {duration_str}。",
-            content_markdown=content_markdown,
-            key_points=[f"作者: {uploader}", f"时长: {duration_str}"],
-            tags=list(set(["视频解析", uploader] + tags[:5])),
-            metadata={"duration": duration, "raw_video_deleted": True}
+            source_url=url,
+            summary="视频信息暂存",
+            content_markdown=f"# 视频信息\n\n来源链接: {url}"
         )

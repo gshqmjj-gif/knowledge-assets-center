@@ -287,7 +287,37 @@ class KnowledgePackageManager:
     ) -> Tuple[str, Path]:
         """
         核心方法：将抓取到的数据实体结构化拆分入库到知识资产包
+        若传入条目包含原子化子项目 (sub_items，如多项目推荐视频或合辑)：
+        自动将每个子项拆解，独立路由归入各自所属领域与子方向的资产包中！
         """
+        if getattr(item, "sub_items", None) and len(item.sub_items) >= 2:
+            logger.info(f"Detected multi-topic collection ({len(item.sub_items)} items). Decomposing and routing each sub-item to its designated package...")
+            affected_packages = []
+            first_pkg_id = None
+            first_path = None
+            for sub in item.sub_items:
+                target_pkg_id, sub_source_path = self._ingest_single_item(sub)
+                if target_pkg_id not in affected_packages:
+                    affected_packages.append(target_pkg_id)
+                if not first_pkg_id:
+                    first_pkg_id = target_pkg_id
+                    first_path = sub_source_path
+
+            item.metadata["packages_affected"] = affected_packages
+            logger.info(f"Successfully decomposed into {len(item.sub_items)} items across packages: {affected_packages}")
+            return first_pkg_id, first_path
+
+        pkg_id, path = self._ingest_single_item(item, preferred_package, preferred_domain, preferred_sub_category)
+        item.metadata["packages_affected"] = [pkg_id]
+        return pkg_id, path
+
+    def _ingest_single_item(
+        self,
+        item: IngestedItem,
+        preferred_package: Optional[str] = None,
+        preferred_domain: Optional[str] = None,
+        preferred_sub_category: Optional[str] = None
+    ) -> Tuple[str, Path]:
         pkg_id = self.route_item_to_package(item, preferred_package, preferred_domain, preferred_sub_category)
         pkg_dir = self.packages_dir / pkg_id
 
