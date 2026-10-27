@@ -1,7 +1,7 @@
 id: general_tech_inbox
 name: 综合技术收藏与待分类资产
 description: 新收藏待归档或跨领域的通用技术资产汇总
-domain: general
+domain: general_inbox
 tags:
 - 网页资料
 - 待归档
@@ -20,3 +20,5 @@ sources:
   ingested_at: '2026-10-26 20:06:00'
   keyframes_count: 0
   snippets_count: 0
+domain_name: 通用知识与综合收藏
+domain_icon: 📥

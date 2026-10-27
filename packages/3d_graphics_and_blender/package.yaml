@@ -1,7 +1,7 @@
 id: 3d_graphics_and_blender
 name: 3d_graphics_and_blender
 description: 3d_graphics_and_blender 相关技术知识沉淀与工程实践资产包
-domain: custom
+domain: 3d_and_visual
 tags:
 - png
 - 设计参考
@@ -21,3 +21,5 @@ sources:
   ingested_at: '2026-10-26 20:12:55'
   keyframes_count: 0
   snippets_count: 0
+domain_name: 三维与数字艺术
+domain_icon: 🎨
