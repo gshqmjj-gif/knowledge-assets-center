@@ -12,7 +12,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from config import PACKAGES_DIR
+from config import PACKAGES_DIR, PRIMARY_DOMAINS
 from core.agent_exporter import AgentExporter
 from core.git_manager import GitManager
 from core.package_manager import KnowledgePackageManager
@@ -41,13 +41,21 @@ app.mount("/packages", StaticFiles(directory=str(PACKAGES_DIR)), name="packages"
 class IngestRequest(BaseModel):
     url: str
     package: Optional[str] = None
+    domain: Optional[str] = None
 
 class CopyRequest(BaseModel):
     text: str
 
+@app.get("/api/domains")
+def list_domains():
+    return {"domains": PRIMARY_DOMAINS}
+
 @app.get("/api/packages")
-def list_packages():
-    return {"packages": pm.list_packages()}
+def list_packages(domain: Optional[str] = None):
+    pkgs = pm.list_packages()
+    if domain and domain != "all":
+        pkgs = [p for p in pkgs if p.get("domain") == domain]
+    return {"packages": pkgs}
 
 @app.get("/api/packages/{package_id}")
 def get_package(package_id: str):
@@ -81,16 +89,21 @@ def get_package(package_id: str):
 def ingest_api(req: IngestRequest):
     try:
         item = dispatcher.dispatch(req.url)
-        pkg_id, source_path = pm.ingest_item(item, preferred_package=req.package)
+        pkg_id, source_path = pm.ingest_item(item, preferred_package=req.package, preferred_domain=req.domain)
         
         # Git 自动提交
         commit_hash = git_mgr.commit(f"feat(kb): ingest [{item.source_type}] {item.title[:40]} into package '{pkg_id}'")
+
+        pkg_meta = pm.get_package(pkg_id) or {}
 
         return {
             "success": True,
             "title": item.title,
             "source_type": item.source_type,
             "package_id": pkg_id,
+            "package_name": pkg_meta.get("name"),
+            "domain_name": pkg_meta.get("domain_name"),
+            "domain_icon": pkg_meta.get("domain_icon"),
             "source_file": source_path.name,
             "keyframes_count": len(item.keyframes),
             "snippets_count": len(item.code_snippets),
@@ -171,6 +184,15 @@ HTML_DASHBOARD = """
         <i class="fa-solid fa-plus-circle text-emerald-400"></i> 一键录入新知识源
       </h2>
       <div class="flex flex-col md:flex-row gap-3">
+        <select id="selectDomain" class="bg-gray-900 border border-gray-700 rounded-xl px-3 py-3 text-white text-sm focus:outline-none focus:border-indigo-500">
+          <option value="">⚡ 智能识别领域</option>
+          <option value="business">💼 商业与商业模式</option>
+          <option value="ai_tech">🤖 AI科技与大模型</option>
+          <option value="architecture">🏛️ 建筑设计与空间计算</option>
+          <option value="3d_and_visual">🎨 三维与数字艺术</option>
+          <option value="product_and_design">💡 产品设计与体验</option>
+          <option value="engineering_and_dev">⚙️ 全栈开发与工程</option>
+        </select>
         <input id="inputUrl" type="text" placeholder="粘贴微信公众号文章链接、微信视频号分享、B站视频地址、技术网页 URL 或图片路径..." 
           class="flex-1 bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 text-sm">
         <button onclick="readFromClip()" class="px-4 py-3 bg-gray-800 hover:bg-gray-700 text-gray-200 rounded-xl text-sm font-medium border border-gray-700 transition flex items-center gap-2 justify-center">
@@ -184,7 +206,7 @@ HTML_DASHBOARD = """
       <div class="mt-3 text-xs text-gray-500 flex flex-wrap gap-4">
         <span><i class="fa-brands fa-weixin text-green-500 mr-1"></i> 支持微信公众号正文与代码解析</span>
         <span><i class="fa-solid fa-video text-blue-400 mr-1"></i> B站视频：无损抽取关键帧截图，免存大体积原视频</span>
-        <span><i class="fa-solid fa-layer-group text-purple-400 mr-1"></i> 自动智能聚类至同类知识资产包</span>
+        <span><i class="fa-solid fa-layer-group text-purple-400 mr-1"></i> 自动按商业/AI/建筑/3D等领域聚合归包</span>
       </div>
     </div>
 
@@ -198,6 +220,16 @@ HTML_DASHBOARD = """
           </h3>
           <button onclick="loadPackages()" class="text-xs text-gray-400 hover:text-white"><i class="fa-solid fa-arrows-rotate"></i> 刷新</button>
         </div>
+
+        <!-- Domain Filter Tabs -->
+        <div class="flex flex-wrap gap-1.5 pb-1 text-xs" id="domainFilterTabs">
+          <button onclick="filterDomain('all')" class="px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-medium dom-btn" data-dom="all">全部</button>
+          <button onclick="filterDomain('business')" class="px-2 py-1 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 dom-btn" data-dom="business">💼 商业</button>
+          <button onclick="filterDomain('ai_tech')" class="px-2 py-1 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 dom-btn" data-dom="ai_tech">🤖 AI</button>
+          <button onclick="filterDomain('architecture')" class="px-2 py-1 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 dom-btn" data-dom="architecture">🏛️ 建筑</button>
+          <button onclick="filterDomain('3d_and_visual')" class="px-2 py-1 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 dom-btn" data-dom="3d_and_visual">🎨 3D</button>
+        </div>
+
         <div id="packagesContainer" class="space-y-3">
           <div class="p-8 text-center text-gray-500 text-sm">加载资产包中...</div>
         </div>
@@ -217,21 +249,38 @@ HTML_DASHBOARD = """
 
   <script>
     let activePackageId = null;
+    let currentDomainFilter = 'all';
+
+    function filterDomain(dom) {
+      currentDomainFilter = dom;
+      document.querySelectorAll('.dom-btn').forEach(btn => {
+        if (btn.dataset.dom === dom) {
+          btn.className = 'px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-medium dom-btn';
+        } else {
+          btn.className = 'px-2 py-1 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 dom-btn';
+        }
+      });
+      loadPackages();
+    }
 
     async function loadPackages() {
       try {
-        const res = await fetch('/api/packages');
+        const url = currentDomainFilter && currentDomainFilter !== 'all' ? `/api/packages?domain=${currentDomainFilter}` : '/api/packages';
+        const res = await fetch(url);
         const data = await res.json();
         const container = document.getElementById('packagesContainer');
         document.getElementById('pkgCount').innerText = data.packages.length;
         if (data.packages.length === 0) {
-          container.innerHTML = '<div class="glass-card p-6 rounded-xl text-center text-gray-400 text-sm">暂无资产包，请在上方录入第一条知识！</div>';
+          container.innerHTML = '<div class="glass-card p-6 rounded-xl text-center text-gray-400 text-sm">该分类下暂无资产包</div>';
           return;
         }
         container.innerHTML = data.packages.map(p => `
           <div onclick="selectPackage('${p.id}')" class="glass-card hover:border-indigo-500/60 transition p-4 rounded-xl cursor-pointer ${activePackageId === p.id ? 'border-indigo-500 bg-gray-800/90' : ''}">
             <div class="flex justify-between items-start mb-1">
-              <h4 class="font-semibold text-white text-sm">${p.name}</h4>
+              <div>
+                <span class="text-[10px] text-indigo-400 font-mono">${p.domain_icon || '📁'} ${p.domain_name || '通用'}</span>
+                <h4 class="font-semibold text-white text-sm mt-0.5">${p.name}</h4>
+              </div>
               <span class="text-xs px-2 py-0.5 bg-indigo-950/70 text-indigo-300 rounded border border-indigo-800/50">${p.item_count} 条</span>
             </div>
             <p class="text-xs text-gray-400 line-clamp-2 mb-2">${p.description}</p>
@@ -376,15 +425,16 @@ HTML_DASHBOARD = """
       statusDiv.innerText = '正在智能识别输入源、抓取内容并提取关键帧与代码片段...';
 
       try {
+        const domain = document.getElementById('selectDomain').value;
         const res = await fetch('/api/ingest', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({url})
+          body: JSON.stringify({url, domain: domain || null})
         });
         const data = await res.json();
         if (data.success) {
           statusDiv.className = 'mt-3 text-xs text-emerald-400 block';
-          statusDiv.innerText = `成功录入《${data.title}》！已归类至资产包 [${data.package_id}]，Git 提交: ${data.commit || 'ok'}`;
+          statusDiv.innerText = `成功录入《${data.title}》！归入 [${data.domain_icon || '📁'} ${data.domain_name}] > 资产包 [${data.package_name || data.package_id}]，Git提交: ${data.commit || 'ok'}`;
           urlInput.value = '';
           await loadPackages();
           selectPackage(data.package_id);
