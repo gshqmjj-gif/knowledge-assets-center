@@ -25,6 +25,8 @@ sources:
   ingested_at: '2026-10-26 20:53:56'
   keyframes_count: 0
   snippets_count: 0
+  associated_entity: REA + Reverse-skill + PentAGI
+  incremental_merged: true
 - id: wechat_article_20261026_我把_3_个_Star_过万的_Skill_串起来，搭了一条能“复刻任意软件”的流水线
   title: 我把 3 个 Star 过万的 Skill 串起来，搭了一条能“复刻任意软件”的流水线
   type: wechat_article
@@ -34,6 +36,8 @@ sources:
   ingested_at: '2026-10-26 20:53:34'
   keyframes_count: 0
   snippets_count: 0
+  associated_entity: REA + Reverse-skill + PentAGI
+  incremental_merged: false
 - id: wechat_article_20261026_Opus_5.5，你竟然这样做视频～！
   title: Opus 5.5，你竟然这样做视频～！
   type: wechat_article
@@ -43,3 +47,60 @@ sources:
   ingested_at: '2026-10-26 20:53:07'
   keyframes_count: 0
   snippets_count: 0
+  associated_entity: Claude
+  incremental_merged: false
+knowledge_matrix:
+- entity_name: Claude
+  domain: general_inbox
+  archetype: general_tech
+  core_function: Claude Opus 5.5是强，我看到很多代码炫酷耍帅的视频。
+  hardware_specs: 标准机器配置 (4G~8G 内存即可无痛运行)
+  environment: Python 3.10+
+  local_deployable: 🟢 本地命令行/独立工具 (无强联网依赖)
+  competitive_advantages:
+  - 模块解耦度高，支持无缝嵌入现有工作流
+  - 输出带证据链追溯，结论可二次核对验证
+  limitations_and_pitfalls:
+  - 依赖外部环境版本一致性，版本漂移可能导致调用失败
+  - 对于超大规模复杂项目，AI 一次性分析可能出现幻觉或切分过粗
+  quickstart_commands: []
+  key_insights: []
+  sources_contributed:
+  - EARS
+  merged_sources_count: 1
+- entity_name: REA + Reverse-skill + PentAGI
+  domain: general_inbox
+  archetype: reverse_engineering
+  core_function: 分析我自己有权分析的软件功能
+  hardware_specs: '轻量级要求: 任意主流Mac/PC (8G+内存，无需高配独立显卡)'
+  environment: Docker 容器环境 + Node.js (>= 18) + MCP (Model Context Protocol) 插件协议客户端
+    + 反编译分析器 (Ghidra / IDA / Hopper)
+  local_deployable: 🟢 100% 纯本地离线运行 (无需云端依赖，数据完全私有安全)
+  competitive_advantages:
+  - REA 社区背书极强 (GitHub 36万 Star)
+  - 比较实用的一点，是会给结论带证据，比如它看到了哪个文件、哪段代码、哪次运行结果
+  - 会给结论带证据，比如它看到了哪个文件、哪段代码、哪次运行结果
+  - '照着理解重写，不是抄对方的代码 [增量补充: 草稿鸭]'
+  - '有出处的解释，再帮你为自己的项目做一个类似版本 [增量补充: 草稿鸭]'
+  - '有出处的解释” [增量补充: 草稿鸭]'
+  limitations_and_pitfalls:
+  - 禁止逆向和加混淆的别碰，这玩意儿只能拿来学习使用，只复刻允许复刻的软件，没有风险
+  - 禁止逆向，有混淆加密的，不要去做技术对抗
+  - Node 版本不对，MCP 没挂上，Docker 起不来，目标选得太大，AI 一口气吐出一大堆分析，看着挺热闹，其实能
+  - 加混淆的别碰，这玩意儿只能拿来学习使用，只复刻允许复刻的软件，没有风险
+  - '容易踩的坑
+
+
+    ### 小白看不懂的地方 [增量补充: 草稿鸭]'
+  - '痛点是：逆向/分析要用一堆工具，新手根本不知道该用哪个、怎么装 [增量补充: 草稿鸭]'
+  - '合规边界：仅限合法研究或已授权目标，禁止碰商业加混淆与加密对抗目标 [增量补充: 草稿鸭]'
+  - '依赖链繁琐：涉及多工具串联，需预先配齐 MCP 协议与指定运行时版本 [增量补充: 草稿鸭]'
+  quickstart_commands: []
+  key_insights:
+  - '整件事分成四段，每段一个主力工具。按顺序走一遍，就能复刻一个功能。 (来源: 草稿鸭)'
+  - '四段走完，一个功能就复刻出来了。要上线的东西，别忘了最后一段。 (来源: 草稿鸭)'
+  - '按顺序走一遍，就能复刻一个功能。 (来源: 草稿鸭)'
+  sources_contributed:
+  - AI开源无界
+  - 草稿鸭
+  merged_sources_count: 2

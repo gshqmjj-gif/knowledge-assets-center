@@ -138,11 +138,36 @@ def get_clipboard_api():
     text = exporter.read_from_clipboard()
     return {"text": text}
 
+@app.get("/api/source_content/{package_id}")
+def get_source_content(package_id: str, file: str):
+    pkg = pm.get_package(package_id)
+    if not pkg:
+        raise HTTPException(status_code=404, detail="Package not found")
+    
+    pkg_dir = Path(pkg["path"])
+    clean_file = file.lstrip("/")
+    target_file = pkg_dir / clean_file
+    
+    try:
+        target_file.resolve().relative_to(pkg_dir.resolve())
+    except Exception:
+        raise HTTPException(status_code=403, detail="Forbidden file access")
+        
+    if not target_file.exists():
+        raise HTTPException(status_code=404, detail="Source file not found")
+        
+    content = target_file.read_text(encoding="utf-8")
+    return {
+        "filename": target_file.name,
+        "path": str(target_file),
+        "content": content
+    }
+
 @app.get("/", response_class=HTMLResponse)
 def index_page():
     return HTML_DASHBOARD
 
-HTML_DASHBOARD = """
+HTML_DASHBOARD = r"""
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -150,12 +175,25 @@ HTML_DASHBOARD = """
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Hermes 知识资产中心 & 知识库创建助手</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
     body { background-color: #0d1117; color: #c9d1d9; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
     .glass-card { background: rgba(22, 27, 34, 0.85); backdrop-filter: blur(8px); border: 1px solid #30363d; }
     .btn-gradient { background: linear-gradient(135deg, #238636 0%, #2ea043 100%); }
     .btn-agent { background: linear-gradient(135deg, #1f6feb 0%, #388bfd 100%); }
+    .prose-clean h1 { font-size: 1.5rem; font-weight: 700; color: #ffffff; margin-top: 1.5rem; margin-bottom: 0.75rem; }
+    .prose-clean h2 { font-size: 1.25rem; font-weight: 600; color: #e6edf3; margin-top: 1.25rem; margin-bottom: 0.5rem; border-bottom: 1px solid #30363d; padding-bottom: 0.25rem; }
+    .prose-clean h3 { font-size: 1.1rem; font-weight: 600; color: #79c0ff; margin-top: 1rem; margin-bottom: 0.5rem; }
+    .prose-clean p { margin-bottom: 0.85rem; line-height: 1.65; color: #c9d1d9; }
+    .prose-clean pre { background: #161b22; padding: 1rem; border-radius: 0.75rem; border: 1px solid #30363d; overflow-x: auto; margin-bottom: 1rem; }
+    .prose-clean code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 0.85rem; }
+    .prose-clean img { max-width: 100%; height: auto; border-radius: 0.5rem; margin: 1rem 0; border: 1px solid #30363d; }
+    .prose-clean table { width: 100%; border-collapse: collapse; margin-bottom: 1rem; font-size: 0.85rem; }
+    .prose-clean th, .prose-clean td { border: 1px solid #30363d; padding: 0.5rem 0.75rem; text-align: left; }
+    .prose-clean th { background: #161b22; color: #ffffff; font-weight: 600; }
+    .prose-clean tr:nth-child(even) { background: #0d1117; }
+    .prose-clean blockquote { border-left: 4px solid #388bfd; padding-left: 1rem; color: #8b949e; margin: 1rem 0; }
   </style>
 </head>
 <body class="min-h-screen">
@@ -173,7 +211,7 @@ HTML_DASHBOARD = """
       </div>
       <div class="flex items-center space-x-3 text-sm">
         <span class="px-3 py-1 bg-gray-800 rounded-full text-emerald-400 border border-emerald-800/40 flex items-center gap-2">
-          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Git 资产库已同步
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> 100% 本地 Git 脱机存储
         </span>
       </div>
     </header>
@@ -204,9 +242,9 @@ HTML_DASHBOARD = """
       </div>
       <div id="ingestStatus" class="mt-3 text-xs hidden"></div>
       <div class="mt-3 text-xs text-gray-500 flex flex-wrap gap-4">
-        <span><i class="fa-brands fa-weixin text-green-500 mr-1"></i> 支持微信公众号正文与代码解析</span>
-        <span><i class="fa-solid fa-video text-blue-400 mr-1"></i> B站视频：无损抽取关键帧截图，免存大体积原视频</span>
-        <span><i class="fa-solid fa-layer-group text-purple-400 mr-1"></i> 自动按商业/AI/建筑/3D等领域聚合归包</span>
+        <span><i class="fa-brands fa-weixin text-green-500 mr-1"></i> 本地永久离线保存配图与正文（杜绝链接失效）</span>
+        <span><i class="fa-solid fa-code-merge text-purple-400 mr-1"></i> 自动增量去重融合（同类知识提炼增量，杜绝重复冗余）</span>
+        <span><i class="fa-solid fa-microchip text-blue-400 mr-1"></i> 结构化提取：硬件配置 / 运行环境 / 能否本地 / 优劣势</span>
       </div>
     </div>
 
@@ -240,9 +278,31 @@ HTML_DASHBOARD = """
         <div id="detailsCard" class="glass-card rounded-2xl p-6 min-h-[500px]">
           <div class="text-center py-20 text-gray-500">
             <i class="fa-solid fa-arrow-left text-3xl mb-3 text-gray-600 block"></i>
-            请在左侧选择一个知识资产包，查看知识脉络、关键帧画面及向 Cursor / Codex / Hermes 一键派发
+            请在左侧选择一个知识资产包，查看结构化知识矩阵、离线存档及向 Cursor / Codex / Hermes 一键派发
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Local Offline Reader Modal (本地脱机阅读器) -->
+  <div id="readerModal" class="fixed inset-0 bg-black/85 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-gray-900 border border-gray-700 w-full max-w-4xl max-h-[90vh] rounded-2xl flex flex-col shadow-2xl">
+      <div class="flex justify-between items-center px-6 py-4 border-b border-gray-800 bg-gray-950/80 rounded-t-2xl">
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="text-xs px-2.5 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800 font-medium">
+              <i class="fa-solid fa-hard-drive mr-1"></i> 100% 本地脱机永久归档 (免依赖原链接)
+            </span>
+            <span id="modalPath" class="text-[11px] text-gray-500 font-mono"></span>
+          </div>
+          <h3 id="modalTitle" class="text-lg font-bold text-white mt-1"></h3>
+        </div>
+        <button onclick="closeReaderModal()" class="text-gray-400 hover:text-white p-2 rounded-lg bg-gray-800 hover:bg-gray-700 transition">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+      <div id="modalBody" class="p-6 overflow-y-auto flex-1 text-sm text-gray-200 leading-relaxed font-sans space-y-4">
       </div>
     </div>
   </div>
@@ -307,6 +367,72 @@ HTML_DASHBOARD = """
         const res = await fetch(`/api/packages/${pkgId}`);
         const data = await res.json();
         const p = data.metadata;
+        const matrix = p.knowledge_matrix || [];
+
+        // 构建结构化知识卡片 HTML
+        let matrixHtml = '';
+        if (matrix.length > 0) {
+          matrixHtml = `
+            <div class="mb-8">
+              <div class="flex justify-between items-center mb-3">
+                <h4 class="text-sm font-semibold text-white flex items-center gap-2">
+                  <i class="fa-solid fa-microchip text-indigo-400"></i> 结构化特性与对比矩阵 (${matrix.length} 个核心方案/实体，已智能去重增量融合)
+                </h4>
+              </div>
+              <div class="grid grid-cols-1 gap-4">
+                ${matrix.map((m, idx) => `
+                  <div class="bg-gray-900/90 border border-gray-800 p-4 rounded-xl space-y-3">
+                    <div class="flex justify-between items-start border-b border-gray-800 pb-2">
+                      <div class="flex items-center gap-2">
+                        <span class="w-6 h-6 rounded-full bg-indigo-900 text-indigo-300 text-xs flex items-center justify-center font-bold">${idx}</span>
+                        <h5 class="text-sm font-bold text-white">${m.entity_name}</h5>
+                        ${m.merged_sources_count > 1 ? `<span class="text-[10px] bg-purple-950 text-purple-300 px-2 py-0.5 rounded border border-purple-800 flex items-center gap-1"><i class="fa-solid fa-code-merge"></i> 融合 ${m.merged_sources_count} 篇资料</span>` : ''}
+                      </div>
+                      <span class="text-xs px-2 py-0.5 rounded ${m.local_deployable.includes('纯本地') ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-amber-950 text-amber-400 border border-amber-800'}">
+                        ${m.local_deployable.split(' ')[0]} ${m.local_deployable.includes('纯本地') ? '纯本地可运行' : '混合架构'}
+                      </span>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+                      <div class="bg-black/30 p-2.5 rounded-lg border border-gray-800/80">
+                        <span class="text-gray-400 block font-semibold mb-0.5"><i class="fa-solid fa-bullseye text-indigo-400 mr-1"></i> 核心功能与定位:</span>
+                        <span class="text-gray-200">${m.core_function || '-'}</span>
+                      </div>
+                      <div class="bg-black/30 p-2.5 rounded-lg border border-gray-800/80">
+                        <span class="text-gray-400 block font-semibold mb-0.5"><i class="fa-solid fa-memory text-yellow-400 mr-1"></i> 硬件配置要求:</span>
+                        <span class="text-gray-200">${m.hardware_specs || '-'}</span>
+                      </div>
+                      <div class="bg-black/30 p-2.5 rounded-lg border border-gray-800/80">
+                        <span class="text-gray-400 block font-semibold mb-0.5"><i class="fa-solid fa-cubes-stacked text-blue-400 mr-1"></i> 运行环境与依赖:</span>
+                        <span class="text-gray-200">${m.environment || '-'}</span>
+                      </div>
+                      <div class="bg-black/30 p-2.5 rounded-lg border border-gray-800/80">
+                        <span class="text-gray-400 block font-semibold mb-0.5"><i class="fa-solid fa-users text-emerald-400 mr-1"></i> 知识贡献来源:</span>
+                        <span class="text-gray-200">${(m.sources_contributed || []).join(', ') || '-'}</span>
+                      </div>
+                    </div>
+
+                    <!-- Advantages & Pitfalls -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs pt-1">
+                      <div class="bg-emerald-950/20 border border-emerald-800/30 p-2.5 rounded-lg">
+                        <span class="text-emerald-400 font-semibold block mb-1"><i class="fa-solid fa-thumbs-up mr-1"></i> 同类核心优势:</span>
+                        <ul class="list-disc list-inside space-y-0.5 text-gray-300">
+                          ${(m.competitive_advantages || []).slice(0, 4).map(a => `<li>${a}</li>`).join('')}
+                        </ul>
+                      </div>
+                      <div class="bg-rose-950/20 border border-rose-800/30 p-2.5 rounded-lg">
+                        <span class="text-rose-400 font-semibold block mb-1"><i class="fa-solid fa-triangle-exclamation mr-1"></i> 劣势、边界与避坑要点:</span>
+                        <ul class="list-disc list-inside space-y-0.5 text-gray-300">
+                          ${(m.limitations_and_pitfalls || []).slice(0, 4).map(pt => `<li>${pt}</li>`).join('')}
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          `;
+        }
 
         container.innerHTML = `
           <div class="border-b border-gray-800 pb-4 mb-6">
@@ -330,6 +456,9 @@ HTML_DASHBOARD = """
             </div>
           </div>
 
+          <!-- Structured Matrix Section -->
+          ${matrixHtml}
+
           <!-- Video Keyframes Section (if any) -->
           ${data.keyframes.length > 0 ? `
             <div class="mb-6">
@@ -347,22 +476,36 @@ HTML_DASHBOARD = """
             </div>
           ` : ''}
 
-          <!-- Sources Accordion -->
+          <!-- Sources List with 100% Offline Reader -->
           <div class="mb-6">
             <h4 class="text-sm font-semibold text-white mb-2 flex items-center gap-2">
-              <i class="fa-solid fa-book-bookmark text-emerald-400"></i> 收录知识源与拆分明细 (${(p.sources || []).length} 条)
+              <i class="fa-solid fa-book-bookmark text-emerald-400"></i> 知识来源清单 (${(p.sources || []).length} 条本地永久脱机存档)
             </h4>
             <div class="space-y-2">
               ${(p.sources || []).map(s => `
-                <div class="bg-gray-900/80 border border-gray-800 p-3 rounded-lg flex justify-between items-center text-xs">
+                <div class="bg-gray-900/80 border border-gray-800 p-3.5 rounded-xl flex flex-col md:flex-row md:justify-between md:items-center gap-2 text-xs">
                   <div>
-                    <span class="text-indigo-400 font-semibold mr-1">[${s.type}]</span>
-                    <span class="text-gray-200 font-medium">${s.title}</span>
-                    <div class="text-gray-500 text-[11px] mt-0.5">作者: ${s.author || '未知'} | 录入: ${s.ingested_at}</div>
+                    <div class="flex items-center gap-2">
+                      <span class="text-indigo-400 font-semibold">[${s.type}]</span>
+                      <span class="text-gray-200 font-bold text-sm">${s.title}</span>
+                      ${s.incremental_merged ? `<span class="text-[10px] bg-purple-950 text-purple-300 px-2 py-0.5 rounded border border-purple-800/80"><i class="fa-solid fa-code-merge"></i> 增量融合至: ${s.associated_entity || '核心矩阵'}</span>` : ''}
+                    </div>
+                    <div class="text-gray-500 text-[11px] mt-1">
+                      <span><i class="fa-solid fa-user-pen mr-1"></i> 作者: ${s.author || '未知'}</span>
+                      <span class="mx-2">|</span>
+                      <span><i class="fa-regular fa-clock mr-1"></i> 录入: ${s.ingested_at}</span>
+                      <span class="mx-2">|</span>
+                      <span class="text-emerald-500 font-mono"><i class="fa-solid fa-file-shield mr-1"></i> ${s.file}</span>
+                    </div>
                   </div>
-                  <a href="${s.url}" target="_blank" class="text-indigo-400 hover:underline text-[11px] flex items-center gap-1">
-                    原链接 <i class="fa-solid fa-arrow-up-right-from-square"></i>
-                  </a>
+                  <div class="flex items-center gap-2">
+                    <button onclick="openLocalReader('${p.id}', '${s.file}', '${encodeURIComponent(s.title)}')" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow transition">
+                      <i class="fa-solid fa-book-open"></i> 本地脱机阅读 (100%保存)
+                    </button>
+                    <a href="${s.url}" target="_blank" class="px-2.5 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-400 rounded-lg text-xs flex items-center gap-1">
+                      原网页 <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                    </a>
+                  </div>
                 </div>
               `).join('')}
             </div>
@@ -371,14 +514,61 @@ HTML_DASHBOARD = """
           <!-- Knowledge Synthesis Markdown -->
           <div>
             <h4 class="text-sm font-semibold text-white mb-2 flex items-center gap-2">
-              <i class="fa-solid fa-file-waveform text-purple-400"></i> 知识资产包沉淀大纲 (SUMMARY.md)
+              <i class="fa-solid fa-file-waveform text-purple-400"></i> 资产包聚合知识体系大纲 (SUMMARY.md 渲染预览)
             </h4>
-            <pre class="bg-gray-900/90 border border-gray-800 p-4 rounded-xl text-xs text-gray-300 font-mono whitespace-pre-wrap max-h-96 overflow-y-auto leading-relaxed">${data.summary}</pre>
+            <div class="bg-gray-900/90 border border-gray-800 p-5 rounded-xl text-xs text-gray-300 max-h-96 overflow-y-auto leading-relaxed prose-clean">
+              ${marked.parse(data.summary)}
+            </div>
           </div>
         `;
       } catch (e) {
         console.error(e);
       }
+    }
+
+    async function openLocalReader(pkgId, file, encodedTitle) {
+      const modal = document.getElementById('readerModal');
+      const modalTitle = document.getElementById('modalTitle');
+      const modalPath = document.getElementById('modalPath');
+      const modalBody = document.getElementById('modalBody');
+
+      modalTitle.innerText = decodeURIComponent(encodedTitle);
+      modalPath.innerText = `${pkgId}/${file}`;
+      modalBody.innerHTML = '<div class="text-center py-20 text-gray-400"><i class="fa-solid fa-spinner animate-spin text-2xl mb-2 block"></i> 正在从本地磁盘读取 100% 脱机存档文件...</div>';
+      modal.classList.remove('hidden');
+
+      try {
+        const res = await fetch(`/api/source_content/${pkgId}?file=${encodeURIComponent(file)}`);
+        const data = await res.json();
+        let content = data.content;
+
+        let fmHtml = '';
+        if (content.startsWith('---')) {
+          const parts = content.split('---', 3);
+          if (parts.length >= 3) {
+            content = parts[2];
+            fmHtml = `
+              <div class="bg-black/50 p-4 rounded-xl border border-gray-800 mb-6 font-mono text-xs">
+                <span class="text-indigo-400 font-bold block mb-1"><i class="fa-solid fa-fingerprint mr-1"></i> 本地脱机归档元数据 (YAML Frontmatter):</span>
+                <pre class="text-emerald-400 text-[11px] whitespace-pre-wrap">${parts[1].trim()}</pre>
+              </div>
+            `;
+          }
+        }
+
+        // 替换本地图片路径以正确显示离线图片
+        content = content.replace(/\(assets\//g, `(/packages/${pkgId}/assets/`);
+        content = content.replace(/\(keyframes\//g, `(/packages/${pkgId}/keyframes/`);
+
+        const parsedHtml = marked.parse(content);
+        modalBody.innerHTML = fmHtml + `<div class="prose-clean">${parsedHtml}</div>`;
+      } catch (e) {
+        modalBody.innerHTML = `<div class="text-rose-400 p-4">加载本地脱机文件失败: ${e.message}</div>`;
+      }
+    }
+
+    function closeReaderModal() {
+      document.getElementById('readerModal').classList.add('hidden');
     }
 
     async function exportToAgent(pkgId, target) {
@@ -420,7 +610,7 @@ HTML_DASHBOARD = """
       }
 
       btn.disabled = true;
-      btn.innerHTML = '<i class="fa-solid fa-spinner animate-spin"></i> 正在爬取与沉淀资产...';
+      btn.innerHTML = '<i class="fa-solid fa-spinner animate-spin"></i> 正在爬取、清洗离线保存与增量融合...';
       statusDiv.className = 'mt-3 text-xs text-indigo-400 block';
       statusDiv.innerText = '正在智能识别输入源、抓取内容并提取关键帧与代码片段...';
 

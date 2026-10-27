@@ -11,7 +11,7 @@ from urllib.parse import urlparse
 import httpx
 from bs4 import BeautifulSoup
 
-from config import DEFAULT_USER_AGENT
+from config import DEFAULT_USER_AGENT, TEMP_DIR
 from crawlers.base import BaseCrawler, IngestedItem
 
 logger = logging.getLogger("hermes.wechat_article")
@@ -77,12 +77,16 @@ class WeChatArticleCrawler(BaseCrawler):
         if not published_date:
             published_date = datetime.now().strftime("%Y-%m-%d")
 
-        # 4. 正文解析与清洗
+        # 4. 正文解析与清洗，并将关键配图下载为本地离线副本 (杜绝防盗链与链接失效)
         content_div = soup.find(id="js_content")
         markdown_lines = []
         code_snippets = []
         key_points = []
         images = []
+        dest_assets_dir = kwargs.get("assets_dir") or (TEMP_DIR / "assets")
+        dest_assets_dir.mkdir(parents=True, exist_ok=True)
+
+        img_counter = 0
 
         if content_div:
             # 提取所有代码块
@@ -119,9 +123,30 @@ class WeChatArticleCrawler(BaseCrawler):
                 elif elem.name == "img":
                     src = elem.get("data-src") or elem.get("src")
                     if src and src.startswith("http"):
-                        alt = elem.get("alt") or "配图"
-                        markdown_lines.append(f"\n![{alt}]({src})\n")
-                        images.append(src)
+                        alt = elem.get("alt") or f"插图_{img_counter+1}"
+                        # 离线下载前 8 张核心配图
+                        local_img_name = ""
+                        if img_counter < 8:
+                            try:
+                                img_counter += 1
+                                safe_slug = re.sub(r'[^a-zA-Z0-9]', '_', title)[:20]
+                                local_filename = f"wechat_{safe_slug}_{img_counter:02d}.png"
+                                local_img_path = dest_assets_dir / local_filename
+                                if not local_img_path.exists():
+                                    with httpx.Client(headers=headers, timeout=8.0) as img_client:
+                                        r_img = img_client.get(src)
+                                        if r_img.status_code == 200 and len(r_img.content) > 1000:
+                                            with open(local_img_path, "wb") as f_img:
+                                                f_img.write(r_img.content)
+                                            local_img_name = local_filename
+                                            images.append(str(local_img_path))
+                            except Exception:
+                                pass
+
+                        if local_img_name:
+                            markdown_lines.append(f"\n![{alt}](assets/{local_img_name})\n")
+                        else:
+                            markdown_lines.append(f"\n![{alt}]({src})\n")
                 elif elem.name == "pre":
                     code = elem.get_text().strip()
                     if code:

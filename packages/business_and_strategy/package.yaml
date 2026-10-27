@@ -25,3 +25,24 @@ sources:
   ingested_at: '2026-10-26 20:27:10'
   keyframes_count: 0
   snippets_count: 0
+  associated_entity: 高客单价SaaS产品的商业变现与定价策略
+  incremental_merged: false
+knowledge_matrix:
+- entity_name: 高客单价SaaS产品的商业变现与定价策略
+  domain: business
+  archetype: business_case
+  core_function: 高客单价SaaS产品的商业变现与定价策略：如何从年付转向多维席位计费
+  hardware_specs: 标准机器配置 (4G~8G 内存即可无痛运行)
+  environment: 跨平台标准环境 (支持 macOS / Linux / Windows)
+  local_deployable: 🟢 本地命令行/独立工具 (无强联网依赖)
+  competitive_advantages:
+  - 模块解耦度高，支持无缝嵌入现有工作流
+  - 输出带证据链追溯，结论可二次核对验证
+  limitations_and_pitfalls:
+  - 依赖外部环境版本一致性，版本漂移可能导致调用失败
+  - 对于超大规模复杂项目，AI 一次性分析可能出现幻觉或切分过粗
+  quickstart_commands: []
+  key_insights: []
+  sources_contributed:
+  - User Manual Capture
+  merged_sources_count: 1

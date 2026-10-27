@@ -12,6 +12,8 @@ from typing import Any, Dict, List, Optional, Tuple
 import yaml
 
 from config import PRIMARY_DOMAINS, PACKAGES_DIR, resolve_domain
+from core.knowledge_distiller import KnowledgeDistiller
+from core.knowledge_merger import KnowledgeMerger
 from crawlers.base import IngestedItem
 
 logger = logging.getLogger("hermes.package_manager")
@@ -290,6 +292,23 @@ class KnowledgePackageManager:
         with open(pkg_dir / "package.yaml", "r", encoding="utf-8") as f:
             meta = yaml.safe_load(f) or {}
 
+        # 5.1 结构化知识特征抽取与增量去重融合 (Incremental Merge)
+        distiller = KnowledgeDistiller()
+        merger = KnowledgeMerger()
+        source_label = item.author or item.title[:20]
+        distilled_card = distiller.distill(
+            title=item.title,
+            text=item.content_markdown,
+            domain=meta.get("domain", "ai_tech"),
+            source_label=source_label
+        )
+
+        existing_matrix = meta.get("knowledge_matrix", [])
+        updated_matrix, is_merged, entity_name = merger.merge_card_into_matrix(
+            existing_matrix, distilled_card, source_label
+        )
+        meta["knowledge_matrix"] = updated_matrix
+
         sources_list = meta.get("sources", [])
         # 避免同 URL 重复记录
         sources_list = [s for s in sources_list if s.get("url") != item.source_url]
@@ -302,7 +321,9 @@ class KnowledgePackageManager:
             "file": f"sources/{source_filename}",
             "ingested_at": item.ingested_at,
             "keyframes_count": len(saved_keyframes),
-            "snippets_count": len(saved_snippets)
+            "snippets_count": len(saved_snippets),
+            "associated_entity": entity_name,
+            "incremental_merged": is_merged
         })
 
         meta["sources"] = sources_list
@@ -318,16 +339,17 @@ class KnowledgePackageManager:
         with open(pkg_dir / "package.yaml", "w", encoding="utf-8") as f:
             yaml.safe_dump(meta, f, allow_unicode=True, sort_keys=False)
 
-        # 6. 重新全量合成与生成 SUMMARY.md 与 AGENT_CONTEXT.md
+        # 6. 重新全量合成与生成结构化知识脉络 SUMMARY.md 与 AGENT_CONTEXT.md
         self.synthesize_package(pkg_id)
 
-        logger.info(f"Ingested item '{item.title}' into package '{pkg_id}' ({source_file_path.name})")
+        logger.info(f"Ingested item '{item.title}' into package '{pkg_id}' (Entity: {entity_name}, Merged: {is_merged})")
         return pkg_id, source_file_path
 
     def synthesize_package(self, package_id: str):
         """
         全量聚合资产包中收录的各源，自动生成高密度、结构化的知识脉络 SUMMARY.md
         以及专门针对 Cursor / Codex / Hermes 的 AGENT_CONTEXT.md
+        包含：核心方案对比矩阵、硬件配置/运行环境/本地离线/优劣势结构化卡片
         """
         pkg_dir = self.packages_dir / package_id
         if not pkg_dir.exists():
@@ -340,6 +362,7 @@ class KnowledgePackageManager:
         description = meta.get("description", "")
         sources = meta.get("sources", [])
         tags = meta.get("tags", [])
+        knowledge_matrix = meta.get("knowledge_matrix", [])
 
         # 扫描 snippets 目录
         snippets_dir = pkg_dir / "snippets"
@@ -357,20 +380,59 @@ class KnowledgePackageManager:
                 if kf.is_file() and kf.suffix.lower() in [".jpg", ".png", ".webp"]:
                     keyframes_list.append(kf.name)
 
-        # 1. 生成 SUMMARY.md
+        # 1. 生成高质量、高密度的结构化知识汇总 SUMMARY.md
         summary_lines = [
             f"# 知识资产包：{pkg_name}",
-            f"> **资产包标识**: `{package_id}` | **标签**: `{', '.join(tags)}`",
-            f"> **收录资源数**: {len(sources)} 篇/条 | **更新时间**: {meta.get('updated_at')}",
+            f"> **资产包标识**: `{package_id}` | **一级领域**: {meta.get('domain_icon', '📁')} {meta.get('domain_name', meta.get('domain'))}",
+            f"> **收录资源数**: {len(sources)} 篇/条 | **沉淀知识实体**: {len(knowledge_matrix)} 个 | **更新时间**: {meta.get('updated_at')}",
             f"> **定位阐述**: {description}\n",
             "---",
-            "## 🧭 核心概念体系与方法论精要 (Methodology & Blueprint)",
-            f"本资产包针对 **{pkg_name}** 进行了跨渠道（微信公众号、视频号、B站视频、技术博客等）的提炼整合，核心聚焦于工程落地可行性与高频技术模式：\n",
-            "1. **架构模式与标准范式**:\n   - 强调模块解耦与声明式定义，降低异构数据源抓取与解析的粘性。\n   - 规范流媒体关键帧与图表资产管理，杜绝无效大体积冗余存储。\n",
-            "2. **实操流程与链路拆解**:\n   - **输入层**: 自动适配微信、B站、网页图文等多模态输入源。\n   - **萃取层**: 关键帧采样截屏、代码逻辑块剥离、元数据清洗。\n   - **沉淀层**: 动态聚合形成资产包，供 Agent 快速作为上下文基底。\n",
-            "## 📦 沉淀代码片段与模板库索引 (Code Snippets)",
+            "## 🌟 核心技术与工程特性对比矩阵 (Structured Knowledge Matrix)",
+            "本表由系统从收录的各篇资料中自动抽取、去重并增量融合提炼而成：\n"
         ]
 
+        if knowledge_matrix:
+            summary_lines.append("| 核心方案/实体 | 核心定位与功能 | 💻 硬件配置要求 | 🌐 运行环境与依赖 | 🔒 能否本地离线运行 | ⚡ 同类核心优势 | ⚠️ 劣势与踩坑要点 | 👥 融合来源数 |")
+            summary_lines.append("| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :---: |")
+            for k in knowledge_matrix:
+                adv_summary = "<br>".join([f"• {a}" for a in k.get("competitive_advantages", [])[:3]])
+                pit_summary = "<br>".join([f"• {p}" for p in k.get("limitations_and_pitfalls", [])[:3]])
+                summary_lines.append(
+                    f"| **{k.get('entity_name')}** | {k.get('core_function')} | {k.get('hardware_specs')} | {k.get('environment')} | {k.get('local_deployable')} | {adv_summary or '-'} | {pit_summary or '-'} | {k.get('merged_sources_count', 1)} 篇融合 |"
+                )
+            summary_lines.append("\n---\n")
+
+            summary_lines.append("## 📋 深度结构化特征卡片详解 (Detailed Entities)")
+            for idx, k in enumerate(knowledge_matrix, 1):
+                summary_lines.append(f"### {idx}. 方案实体: {k.get('entity_name')}")
+                summary_lines.append(f"- **🎯 核心功能与定位**: {k.get('core_function')}")
+                summary_lines.append(f"- **💻 硬件配置规格**: `{k.get('hardware_specs')}`")
+                summary_lines.append(f"- **🌐 运行环境与依赖栈**: `{k.get('environment')}`")
+                summary_lines.append(f"- **🔒 本地化与隐私能力**: {k.get('local_deployable')}")
+                
+                summary_lines.append("- **⚡ 同类对比核心优势**:")
+                for adv in k.get("competitive_advantages", []):
+                    summary_lines.append(f"  - {adv}")
+
+                summary_lines.append("- **⚠️ 劣势、边界与避坑踩坑要点**:")
+                for pit in k.get("limitations_and_pitfalls", []):
+                    summary_lines.append(f"  - {pit}")
+
+                if k.get("quickstart_commands"):
+                    summary_lines.append("- **🛠️ 上手验证常用指令**:")
+                    for cmd in k.get("quickstart_commands"):
+                        summary_lines.append(f"  ```bash\n  {cmd}\n  ```")
+
+                if k.get("key_insights"):
+                    summary_lines.append("- **💡 实战心法与核心认知**:")
+                    for ins in k.get("key_insights"):
+                        summary_lines.append(f"  - {ins}")
+
+                summary_lines.append(f"- **👥 知识贡献来源**: {', '.join(k.get('sources_contributed', [])) or '全库沉淀'}\n")
+        else:
+            summary_lines.append("> (暂无抽取到的知识卡片，待录入后自动呈现)\n")
+
+        summary_lines.append("## 📦 沉淀代码片段与模板库索引 (Code Snippets)")
         if snippets_list:
             for snip in snippets_list:
                 summary_lines.append(f"- [`{snip}`](snippets/{snip})")
@@ -383,7 +445,8 @@ class KnowledgePackageManager:
             for kf in keyframes_list[:8]:
                 summary_lines.append(f"- ![{kf}](keyframes/{kf})")
 
-        summary_lines.append("\n## 📚 收录知识来源总清单 (Sources Inventory)")
+        summary_lines.append("\n## 📚 原始知识本地脱机存档清单 (Local Offline Archives)")
+        summary_lines.append("> 提示：所有正文、代码与排版均已 100% 离线克隆至本地 Git 仓库，外部链接失效亦可永久脱机查阅：")
         for src in sources:
             src_type_icon = {
                 "wechat_article": "📄 [微信公众号]",
@@ -392,8 +455,9 @@ class KnowledgePackageManager:
                 "webpage": "🌐 [网页博客]",
                 "image": "🖼️ [图片资产]"
             }.get(src.get("type"), "📌 [资料]")
+            merge_badge = " `[已去重增量融合]`" if src.get("incremental_merged") else ""
             summary_lines.append(
-                f"- {src_type_icon} [{src.get('title')}]({src.get('file')}) —— *作者: {src.get('author') or '未知'}* | [原始链接]({src.get('url')})"
+                f"- {src_type_icon} **[{src.get('title')}]({src.get('file')})**{merge_badge} —— *作者: {src.get('author') or '未知'}* | [原始链接]({src.get('url')})"
             )
 
         with open(pkg_dir / "SUMMARY.md", "w", encoding="utf-8") as f:
@@ -405,17 +469,27 @@ class KnowledgePackageManager:
             "<!-- This file is auto-generated for Cursor, Codex and Hermes Agent Reference -->",
             f"**Domain**: {meta.get('domain')} | **Tags**: {', '.join(tags)}",
             f"**Description**: {description}\n",
+            "## Structured Project Constraints & Technical Capabilities:",
+        ]
+
+        if knowledge_matrix:
+            for k in knowledge_matrix:
+                agent_lines.append(f"### Target Entity: {k.get('entity_name')}")
+                agent_lines.append(f"- **Purpose**: {k.get('core_function')}")
+                agent_lines.append(f"- **Hardware Constraints**: {k.get('hardware_specs')}")
+                agent_lines.append(f"- **Runtime Environment**: {k.get('environment')}")
+                agent_lines.append(f"- **Deployment**: {k.get('local_deployable')}")
+                agent_lines.append(f"- **Verified Advantages**: {'; '.join(k.get('competitive_advantages', []))}")
+                agent_lines.append(f"- **Strict Pitfalls & Gotchas**: {'; '.join(k.get('limitations_and_pitfalls', []))}\n")
+
+        agent_lines.extend([
             "## Project Constraints & Directives for Agent:",
             f"1. You are operating as an expert specialist in {pkg_name}.",
-            "2. When generating code, strictly follow the patterns, APIs, and idioms cataloged in this knowledge package.",
+            "2. When generating code, strictly follow the hardware constraints and environment dependencies cataloged above.",
             "3. Do not re-download raw videos or save binary bloat; strictly use keyframes, transcripts, and atomic snippets.",
-            "4. Prefer clean, modern, modular implementations with thorough error handling and zero-latency retrieval.\n",
-            "## Primary Concepts & Architectural Rules:",
-            f"- Context Package ID: `{package_id}`",
-            f"- Ingested items count: {len(sources)}",
-            f"- Key topics: {', '.join(tags)}\n",
+            "4. Respect the pitfalls and limitations outlined above to prevent dead ends.\n",
             "## Included Sources & References:"
-        ]
+        ])
         for src in sources[:10]:
             agent_lines.append(f"- **{src.get('title')}** (Source: {src.get('url')})")
 
