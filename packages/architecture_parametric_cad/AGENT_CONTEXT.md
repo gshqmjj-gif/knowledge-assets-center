@@ -10,7 +10,7 @@
 - **Runtime Environment**: 硬件要求: 普通工作站或轻薄本即可无痛运行 + 运行环境: Python 3.9+ + OpenSCAD / FreeCAD CLI 工业引擎
 - **Deployment**: 本地化支持: 🟢 100% 本地生成与导出标准工业文件 (离线即用，完全保护商业工业构件机密)
 - **Verified Advantages**: 【工业级可用格式】直接输出标准 STEP / STL / 3MF，而非不可加工的游戏低模网格。; 【可制造性检查】自动验证壁厚、装配干涉与切削物理可行性，并自动出具带尺寸的工程图。; 【打样闭环】支持直接连通 3D 打印、钣金冲压与 CNC 代工服务一键打样下单。
-- **Strict Pitfalls & Gotchas**: 【合规红线】严格限定合法学习或授权复刻，严禁对明确禁止逆向或商业加密混淆做对抗。; 【环境排错】涉及多工具串联，遇到报错应保留完整日志并逐项单点排查，切忌全量同时修改。; 【复刻边界】切忌盲目原样搬运代码或素材；复刻核心在于摸清行为逻辑后独立自研重写。; 【安全界限】自动化工具仅提供初步扫描，业务逻辑漏洞与敏感权限仍需人工专项复核。
+- **Strict Pitfalls & Gotchas**: 【复杂曲面边界】当前最擅长规则机械零件与参数化装配体；极度复杂的自由流体有机曲面仍需手工建模配合。
 
 ## Project Constraints & Directives for Agent:
 1. You are operating as an expert specialist in architecture_parametric_cad.

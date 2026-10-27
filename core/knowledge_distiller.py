@@ -233,7 +233,7 @@ class KnowledgeDistiller:
 
     def _extract_advantages(self, text: str, title: str) -> List[str]:
         sec_bullets = self._extract_section_bullets(text, ["优势", "对比", "特点", "亮点", "advantage"])
-        if sec_bullets and len(sec_bullets) >= 2:
+        if sec_bullets:
             return sec_bullets[:4]
 
         advantages = []
@@ -258,31 +258,31 @@ class KnowledgeDistiller:
         if rewrite_sent:
             advantages.append(f"【自研复刻】理解架构逻辑后独立重写：{rewrite_sent}")
         else:
-            advantages.append("【干净复刻】基于行为推演重写自主版本，有效规避版权与混淆对抗风险。")
+            advantages.append("【能力突破】针对特定业务痛点提供显著效率提升与流程优化。")
 
         # 4. 全流程闭环
         pipeline_sent = next((s for s in sents if any(k in s for k in ["整件事分成", "四段走完", "搭了一条", "接成一条完整的流水线"])), None)
         if pipeline_sent:
             advantages.append(f"【闭环流程】多工具自动化串联：{pipeline_sent}")
         else:
-            advantages.append("【端到端协同】从目标分析、环境依赖配齐到安全初筛，构建一体化工作流。")
+            advantages.append("【端到端协同】从目标分析、环境依赖配齐到成果交付，构建一体化工作流。")
 
         return advantages[:4]
 
     def _extract_pitfalls(self, text: str, title: str) -> List[str]:
-        sec_bullets = self._extract_section_bullets(text, ["劣势", "避坑", "边界", "注意", "限制", "风险", "pitfall"])
-        if sec_bullets and len(sec_bullets) >= 2:
+        sec_bullets = self._extract_section_bullets(text, ["劣势边界与避坑要点", "劣势", "避坑", "踩坑", "缺陷", "局限性", "pitfall"])
+        if sec_bullets:
             return sec_bullets[:4]
 
         pitfalls = []
         sents = self._split_into_valid_sentences(text)
 
-        # 1. 合规与混淆对抗红线
+        # 1. 合规与边界红线
         compliance_sent = next((s for s in sents if any(k in s for k in ["禁止逆向", "加混淆", "技术对抗", "商业软件的完整功能", "别碰", "授权的目标"])), None)
         if compliance_sent:
             pitfalls.append(f"【合规红线】严禁技术对抗：{compliance_sent}")
         else:
-            pitfalls.append("【合规红线】严格限定合法学习或授权复刻，严禁对明确禁止逆向或商业加密混淆做对抗。")
+            pitfalls.append("【合规红线】严格限定合法学习或授权复刻，遵守开源许可与数据安全规范。")
 
         # 2. 环境与依赖配置坑
         env_sent = next((s for s in sents if any(k in s for k in ["Node 版本不对", "command not found", "MCP 没挂上", "Docker 起不来", "缺什么工具就装"])), None)
@@ -296,14 +296,14 @@ class KnowledgeDistiller:
         if scope_sent:
             pitfalls.append(f"【复刻边界】严禁机械抄袭：{scope_sent}")
         else:
-            pitfalls.append("【复刻边界】切忌盲目原样搬运代码或素材；复刻核心在于摸清行为逻辑后独立自研重写。")
+            pitfalls.append("【复刻边界】切忌盲目原样搬运；核心在于摸清行为逻辑后独立自研重写。")
 
         # 4. 安全检测与上线边界
         sec_sent = next((s for s in sents if any(k in s for k in ["不能拿它当", "安全的证明", "安全测试的证明", "PentAGI 能帮忙找问题", "弱密码", "业务逻辑漏洞"])), None)
         if sec_sent:
             pitfalls.append(f"【安全界限】自动化检测仅为辅助：{sec_sent}")
         else:
-            pitfalls.append("【安全界限】自动化工具仅提供初步扫描，业务逻辑漏洞与敏感权限仍需人工专项复核。")
+            pitfalls.append("【安全界限】自动化工具仅提供初步分析，复杂业务逻辑与生产环境仍需人工专项复核。")
 
         return pitfalls[:4]
 

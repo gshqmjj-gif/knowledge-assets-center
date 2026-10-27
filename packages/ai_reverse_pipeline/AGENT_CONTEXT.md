@@ -4,13 +4,13 @@
 **Description**: REA + Reverse-skill + PentAGI 自动化逆向、逻辑推演与 1:1 复刻工程流水线
 
 ## Structured Project Constraints & Technical Capabilities:
-### Target Entity: REA + Reverse-skill + PentAGI
-- **Purpose**: 把 REA、Reverseskill、PentAGI 这三个 Skill 搭起来以后，能做一件挺完整的事：看到一个软件功能，先让 AI 去查它是怎么实现的，再按我们自己的技术栈写一个新版本，最后在上线前帮忙找一轮安全问题
-- **Hardware Constraints**: 轻量级要求: 任意主流Mac/PC (8G+内存，无需独显，轻量CPU即可)
-- **Runtime Environment**: Docker 容器环境 + Node.js (>= 18) + MCP (Model Context Protocol) 插件客户端 + 反编译分析器 (Ghidra / IDA) + 硬件要求: 轻量级要求: 任意主流 Mac/PC (8G + 内存，无需独显，轻量CPU即可) + 运行环境: Node.js (>= 18) + Python 3.10 + Ghidra/IDA 反编译分析器
-- **Deployment**: 🟢 本地命令行/独立工具 (无强联网依赖)
-- **Verified Advantages**: 【社区验证】核心组件在 GitHub 斩获 36万 Star，能力经过广泛开源社区实战验证。; 【结论可查】推演带证据链追溯：它比较实用的一点，是会给结论带证据，比如它看到了哪个文件、哪段代码、哪次运行结果; 【干净复刻】基于行为推演重写自主版本，有效规避版权与混淆对抗风险。; 【端到端协同】从目标分析、环境依赖配齐到安全初筛，构建一体化工作流。; 【成熟生态】工具链模块解耦度高，支持快速组合并无缝嵌入现有工程流。 [补充: 草稿鸭]
-- **Strict Pitfalls & Gotchas**: 【合规红线】严禁技术对抗：这一套组合下来，基本能复刻任何软件，但禁止逆向和加混淆的别碰，这玩意儿只能拿来学习使用，只复刻允许复刻的软件，没有风险; 【环境排错】多工具链依赖配置：Node 版本不对，MCP 没挂上，Docker 起不来，目标选得太大，AI 一口气吐出一大堆分析，看着挺热闹，其实能用的没几条; 【复刻边界】严禁机械抄袭：很多人看到“复刻软件”，第一反应是把别人的东西原样搬过来; 【安全界限】自动化检测仅为辅助：PentAGI 能帮忙找问题，但不能拿它当系统安全的证明
+### Target Entity: REA
+- **Purpose**: 核心解决痛点: 让 AI 逆向任何 App，一直拆到二进制；装上之后你的 AI 能多做什么: 让 AI 逆向任何 App，一直拆到二进制，显著突破传统工作流瓶颈。
+- **Hardware Constraints**: 硬件要求: 轻量级要求: 任意主流 Mac/PC (8G+内存，无需独显，轻量CPU即可) / 运行环境: Node.js (>= 18) + Python 3.10+ + Ghidra/IDA 反编译分析器
+- **Runtime Environment**: 硬件要求: 轻量级要求: 任意主流 Mac/PC (8G + 内存，无需独显，轻量CPU即可) + 运行环境: Node.js (>= 18) + Python 3.10 + Ghidra/IDA 反编译分析器 + Docker 容器环境 + MCP (Model Context Protocol) 插件客户端 + 反编译分析器 (Ghidra / IDA)
+- **Deployment**: 本地化支持: 🟢 100% 本地运行 (反编译、二进制分析与比对完全离线，模型推演支持 Ollama 本地部署)
+- **Verified Advantages**: 【全自动端到端证据链】每一个反推的函数均配有反编译汇编与内存调用链证据，结论可逐项溯源核对。; 【闭环编译验证】实测老游戏声道函数复刻，3200 组单元测试全覆盖，二进制产物 63 字节完全吻合。; 【深入最底层】不仅拆解前端网页和桌面界面，还能一路探查到底层二进制机器码。; 【成熟生态】工具链模块解耦度高，支持快速组合并无缝嵌入现有工程流。 [补充: 草稿鸭]; 【结论可查】推演带证据链追溯：Codex 照着 REA 那份带证据的解释，用你熟悉的工具写一个属于你的版本 [补充: 草稿鸭]
+- **Strict Pitfalls & Gotchas**: 【合规红线】严格限定合法学习或授权复刻，严禁对明确禁止逆向或商业加密混淆做对抗破解。; 【复杂函数防幻觉】对极长未导出二进制函数需结合动态插桩验证，不能单凭 LLM 静态猜测。; 【环境排错】多工具链依赖配置：Reverseskill 会判断这次该走哪条路，缺什么工具就装什么 [补充: 草稿鸭]; 【复刻边界】切忌盲目原样搬运；核心在于摸清行为逻辑后独立自研重写。 [补充: 草稿鸭]; 【安全界限】自动化工具仅提供初步分析，复杂业务逻辑与生产环境仍需人工专项复核。 [补充: 草稿鸭]
 
 ## Project Constraints & Directives for Agent:
 1. You are operating as an expert specialist in AI逆向分析与软件复刻流水线.
