@@ -183,7 +183,8 @@ class KnowledgePackageManager:
         """
         meta_dict = getattr(item, "metadata", {}) or {}
         target_pkg = preferred_package or meta_dict.get("preferred_package")
-        target_domain = preferred_domain or meta_dict.get("domain")
+        raw_dom = preferred_domain or meta_dict.get("domain")
+        target_domain = raw_dom if (raw_dom and raw_dom in PRIMARY_DOMAINS) else (preferred_domain if preferred_domain else None)
         target_sub_cat = preferred_sub_category or meta_dict.get("sub_category")
 
         search_blob = f"{item.title} {item.summary} {' '.join(item.tags)} {item.content_markdown[:1000]}".lower()
@@ -297,7 +298,8 @@ class KnowledgePackageManager:
         """
         meta_dict = getattr(item, "metadata", {}) or {}
         target_pkg = meta_dict.get("preferred_package")
-        target_domain = meta_dict.get("domain")
+        raw_domain = meta_dict.get("domain")
+        target_domain = raw_domain if (raw_domain and raw_domain in PRIMARY_DOMAINS) else None
         target_sub = meta_dict.get("sub_category")
 
         # 若内容已显式指定了资产包或领域
@@ -347,40 +349,40 @@ class KnowledgePackageManager:
 
         # 无法按照目前分类表结构化：生成智能推荐新类别
         title_lower = (item.title + " " + item.summary).lower()
-        if any(k in title_lower for k in ["医", "药", "健康", "针灸", "穴位", "临床", "病", "养生"]):
+        if any(k in title_lower for k in ["医学", "医疗", "医药", "健康科普", "针灸", "穴位", "临床", "疾病", "养生"]):
             sug_domain_name = "生命健康与医药前沿"
             sug_domain_key = "health_medicine"
             sug_domain_icon = "🧬"
             sug_sub_name = "临床诊疗与健康科普"
             sug_sub_key = "clinical_health"
             sug_sub_icon = "💊"
-        elif any(k in title_lower for k in ["游戏", "game", "玩法", "虚幻", "unity", "打击感", "关卡", "boss"]):
+        elif any(k in title_lower for k in ["游戏研发", "游戏引擎", "玩法设计", "虚幻引擎", "unity3d", "打击感", "关卡设计", "boss战"]):
             sug_domain_name = "游戏研发与互动叙事"
             sug_domain_key = "game_dev"
             sug_domain_icon = "🎮"
             sug_sub_name = "游戏引擎与关卡机制"
             sug_sub_key = "mechanics"
             sug_sub_icon = "🕹️"
-        elif any(k in title_lower for k in ["法", "合规", "合同", "诉讼", "律师", "知识产权", "版权"]):
+        elif any(k in title_lower for k in ["法律", "法规", "合规审查", "合同法", "诉讼", "律师", "知识产权", "版权侵权"]):
             sug_domain_name = "法律合规与商业法务"
             sug_domain_key = "law_compliance"
             sug_domain_icon = "⚖️"
             sug_sub_name = "企业法务与合同审查"
             sug_sub_key = "compliance_review"
             sug_sub_icon = "📜"
-        elif any(k in title_lower for k in ["财", "投资", "股票", "量化", "估值", "宏观", "基金", "理财"]):
+        elif any(k in title_lower for k in ["金融投资", "财务报表", "股票市场", "量化交易", "公司估值", "宏观经济", "基金理财"]):
             sug_domain_name = "金融投资与量化经济"
             sug_domain_key = "finance_investing"
             sug_domain_icon = "📈"
             sug_sub_name = "宏观研报与投资逻辑"
             sug_sub_key = "macro_investment"
             sug_sub_icon = "💹"
-        elif any(k in title_lower for k in ["美食", "料理", "烹饪", "咖啡", "烘焙", "拉花", "餐厅"]):
-            sug_domain_name = "生活方式与美食技艺"
+        elif any(k in title_lower for k in ["美食", "料理", "烹饪", "咖啡", "烘焙", "拉花", "餐厅", "甜点", "西点"]):
+            sug_domain_name = "美食烹饪与生活艺术"
             sug_domain_key = "lifestyle_culinary"
             sug_domain_icon = "☕"
-            sug_sub_name = "餐饮工艺与精品咖啡"
-            sug_sub_key = "craft_coffee"
+            sug_sub_name = "餐饮工艺与精品甜点"
+            sug_sub_key = "craft_culinary"
             sug_sub_icon = "🥐"
         else:
             clean_tag = item.tags[0] if (item.tags and len(item.tags[0]) <= 8) else item.title[:8]

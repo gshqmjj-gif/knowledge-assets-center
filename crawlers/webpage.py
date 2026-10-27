@@ -157,5 +157,5 @@ class WebpageCrawler(BaseCrawler):
             tags=list(set(tags)),
             code_snippets=code_snippets,
             assets=images[:8],
-            metadata={"domain": domain_host, "snippets_count": len(code_snippets)}
+            metadata={"source_host": domain_host, "snippets_count": len(code_snippets)}
         )

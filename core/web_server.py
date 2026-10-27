@@ -141,8 +141,11 @@ def ingest_api(req: IngestRequest):
 
         # 1. 用户允许创建新类别
         if req.allow_create_new and req.new_domain_name and req.new_sub_name:
-            dom_key = req.new_domain_key or re.sub(r'[^a-zA-Z0-9_]', '_', req.new_domain_name).lower().strip('_')
-            sub_key = req.new_sub_key or re.sub(r'[^a-zA-Z0-9_]', '_', req.new_sub_name).lower().strip('_')
+            import hashlib
+            clean_dom = re.sub(r'[^a-zA-Z0-9_]', '_', req.new_domain_name).lower().strip('_')
+            dom_key = req.new_domain_key or clean_dom or f"custom_{hashlib.md5(req.new_domain_name.encode()).hexdigest()[:6]}"
+            clean_sub = re.sub(r'[^a-zA-Z0-9_]', '_', req.new_sub_name).lower().strip('_')
+            sub_key = req.new_sub_key or clean_sub or f"sub_{hashlib.md5(req.new_sub_name.encode()).hexdigest()[:6]}"
             new_pkg_id = pm.create_custom_domain_and_package(
                 domain_key=dom_key,
                 domain_name=req.new_domain_name,
@@ -218,8 +221,10 @@ def ingest_api(req: IngestRequest):
             "source_type": item.source_type,
             "package_id": pkg_id,
             "package_name": pkg_meta.get("name"),
+            "domain": pkg_meta.get("domain"),
             "domain_name": pkg_meta.get("domain_name"),
             "domain_icon": pkg_meta.get("domain_icon"),
+            "sub_category": pkg_meta.get("sub_category"),
             "sub_category_name": pkg_meta.get("sub_category_name"),
             "sub_category_icon": pkg_meta.get("sub_category_icon"),
             "source_file": source_path.name if source_path else "",
@@ -1181,8 +1186,12 @@ HTML_DASHBOARD = r"""
           body: JSON.stringify({
             url: pendingClfData.item_preview.url,
             allow_create_new: true,
+            new_domain_key: pendingClfData.suggested_category ? pendingClfData.suggested_category.domain_key : null,
             new_domain_name: newDomainName,
+            new_domain_icon: pendingClfData.suggested_category ? pendingClfData.suggested_category.domain_icon : '📁',
+            new_sub_key: pendingClfData.suggested_category ? pendingClfData.suggested_category.sub_key : null,
             new_sub_name: newSubName,
+            new_sub_icon: pendingClfData.suggested_category ? pendingClfData.suggested_category.sub_icon : '📌',
             force_confirm: true
           })
         });
