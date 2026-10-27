@@ -1,0 +1,25 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Temp files and video downloads (strict: never commit raw video files)
+*.mp4
+*.mkv
+*.flv
+*.avi
+*.mov
+*.webm
+.cache/
+temp/
+tmp/
+*.tmp
+
+# System files
+.DS_Store
+Thumbs.db
