@@ -1,0 +1,168 @@
+---
+title: Opus 5.5，你竟然这样做视频～！
+source_type: wechat_article
+source_url: https://mp.weixin.qq.com/s/jZwxMX9nWsD0abzrPWe0Ig
+author: EARS
+published_date: '2026-10-26'
+ingested_at: '2026-10-26 20:53:07'
+tags:
+- AI
+- EARS
+- 微信公众号
+keyframes: []
+snippets: []
+assets: []
+---
+
+## 好片子，技术越来越不重要，立意，思想才是核心！
+我这个人确实，很反骨。
+Claude Opus 5.5是强，我看到很多代码炫酷耍帅的视频。
+但是看到第十个的时候，我已经～～
+觉得不好看了，包括我自己的这条片子
+做法so easy：把自己的网站和代码库提交给opus，说给我做一个宣传片
+出来之后的1个小时内是满意的
+很快就不喜欢了
+视觉不惊艳，每一帧都不是最好看的，不够动人。
+乔布斯讲过类似的话：不要去做一个视频介绍功能，像个推销员，而是要找到价值，愿景——所以当年他们的宣传片放了一大堆爱因斯坦：“苹果电脑是给这个世界上最聪明的人用的。”
+而下面这个成果，我是相对满意的
+这个片子来自我的一个提问：你能给我推荐一些适合Omia的电影嘛？
+
+## 一、五个方向，我选了维米尔
+
+![配图](https://mmbiz.qpic.cn/mmbiz_jpg/7sJ3tx6734XlQWsyiaicTeuJhbkvnvbC3iauo9s7LfOuy5lgvQTJKQMJARHp6ft3q5PctfCBtBNqmGZ4RtqIyGsxuGxNaH7AP7rNCPibicntt9x4/640?from=appmsg)
+Claude 给了我五个方向的概念图：
+看到第五张的时候就定了：那束全凭感觉。于是opus给我基于维米尔给了我三个剧本方向。
+
+## 二、剧本：从三个短故事，到一个立意
+
+![配图](https://mmbiz.qpic.cn/sz_mmbiz_jpg/7sJ3tx6734WTz5mg3oCDyBVRv7XNWb1ticGDdHayCJY80pY9lmC4zNiaZ64u5vaLJICUvYBsqup1ULJwtLr95rlOoB4yPqUY5wdTjzg7Gmcrk/640?from=appmsg)
+Claude 先写了三个短剧本，每个配了三张分镜：
+三个都挺有意思，但击中我的一句话是：
+「每个时代，都会造一台看世界的机器」
+我觉得这句话立意很高，一下子把人们的视野拓宽了几百年，有了厚重感和史诗般的基调。而omia的本质，就是”看“。
+顺着这句话，Claude 去找到了一个有意思的支点：
+拉丁文里，camera 的意思就是「房间」。
+把这个历史抽象起来，会感觉到，眼睛、暗箱、相机、电影院、屏幕……人类造过的每一台「看的机器」，结构都一样：一间暗室，一个开口，一面接住光的墙。每个时代都在给这个房间换一个新的开口。
+片名就这么来了：一个房间的四百年。
+
+### 台词改了四轮
+
+### 避免AI幻觉
+这是一部有「科普感」的片子，史实不能错。Claude 派了一个子任务逐条去查，改掉了好几处容易写错的地方，比如：
+
+## 三、画：同一个房间，四百年
+
+![配图](https://mmbiz.qpic.cn/mmbiz_jpg/7sJ3tx6734W3ojphsRMPIKKfdNwnRKTktjdVXP4j5qnnH5uWzVVkaiaicEb7uDhib8xGgyodtmQFias5NBU4ibNoJOo1CtWDY2DfsYvMKAibxtFics/640?from=appmsg)
+所有画面都是 AI 画的油画。最关键的一招是：先生成一张 1660 年的房间当「母版」，后面每个年代都拿它当参考来画（维米尔画风）。
+所以窗、墙、桌子始终在同一个位置，只有桌上的机器和墙上的影像在变：
+叠化起来，就像同一个房间的延时摄影。
+
+![配图](https://mmbiz.qpic.cn/mmbiz_jpg/7sJ3tx6734UQLuRkfnHTH21icGjcFR8VySSuyhcwZicKo7XPCmiaRWqByRyjuFLtTVFH6NNGddAwsT5noWbYPwMibqR1F29RgPZsPYrV68TuFBk/640?from=appmsg)
+
+## 四、「图片太死了，太像 PPT」
+第一个小样出来，我的反馈很直接：
+图片太死了都完全不动，看起来有点太像 PPT 了，不高级。
+一开始 Claude 用代码给画加了「深度」：算出画里每个东西离镜头多远，镜头一动，近的走得快、远的走得慢，平面的画就有了立体感。
+
+![配图](https://mmbiz.qpic.cn/sz_mmbiz_jpg/7sJ3tx6734WrMq8uQ7DH79pIczF9nSfKokYogLOdMoprUg4utjHibwDuEZBibOnf6TrJaLmzNu94pffj3jS9L6x8icgicqagU1RvmEdZpCNiaoEA/640?from=appmsg)
+（白色是近处，黑色是远处）
+但这还不够。真正让画「活」起来的，是眨眼。
+我让它试试用 Seedance 把眼睛那张画做成视频，让眼睛眨一下。出来的那一刻我就觉得对了：「眨眼就很生动」。
+
+![配图](https://mmbiz.qpic.cn/sz_mmbiz_jpg/7sJ3tx6734UOKQicO5ic9NpAtpdPPjByC51fDGf7gut9EP7YfoUQT638fHprXiaibM8AeLibzvZuuKX5WryeuwMbeJFGRviaOvu8pXdUlBNd62KU4/640?from=appmsg)
+于是后面的每个镜头都这么做：把油画交给 AI 视频模型，让火苗真的跳起来，让墙上的倒影真的走过去，让运河的水真的在闪。
+
+![配图](https://mmbiz.qpic.cn/mmbiz_jpg/7sJ3tx6734Xx0ibZ4zWBxiaCB8739cYB1HHtpoXOAtm5enkMPCV610yZeA7AnkMibEb21uNPTauzTHWmiccb7ttKGRicV1vMNv06CDQ8KIwBycXk/640?from=appmsg)
+
+![配图](https://mmbiz.qpic.cn/mmbiz_jpg/7sJ3tx6734WlU78MTZMyl1LHTGzMH9re057I8Yppart6poibFgrsouhSPHt7Jq7KLZDsPvFiakxk2WGamO3SdiaOEfiajiaSptZQUrn7Ud2kCNgI/640?from=appmsg)
+（上：交给 AI 的油画；下：AI 生成的第 6 秒，火腾起来了，人举起了手）
+这里有个细节：AI 视频总会偷偷推近一点、平移一点。Claude 就把每一帧都「钉」回原来那张画的位置——打个比方，就像投影仪有点晃，它把每一帧都对准回画框。这样后面叠上去的金线、字幕、说明牌，位置永远是准的。
+
+![配图](https://mmbiz.qpic.cn/sz_mmbiz_jpg/7sJ3tx6734WTfVAYJfxMKtAuYFvFHBX5NWB5ic4ZAdMoWxHUh396lL3C1o61icX3un09y0YHQo5JcYibjYeLD4GPvm6fmnSt8EhLmg3BvWiaMRw/640?from=appmsg)
+
+## 五、声音：我听了很多遍
+旁白。我挑了一个沙哑、有分量的纪录片声线。一开始直接用 AI 生成，结果它时不时乱来：有一次把语气提示也念了出来，还有一次自己编了一段北欧神话。后来改成用我 Windows 电脑上的本地模型，克隆这个声线，一句一句生成，每句都让 AI 听写回来逐词核对。
+配乐。最早是代码合成的，我觉得「配乐和音效不够好」，最后用的是 Google 的 Lyria 作曲：给它写一份像给电影作曲家的简报——一个四个音的主题贯穿全片，每个时代换一件乐器演奏它——一次出五版，我挑了第五版。
+音效。我提醒它：「你生产的那些短片里面有一些音效，可以提取出来用」。AI 视频本身是带声音的，火、水、风都有，把它自己配的音乐去掉，剩下的就是环境声。再加上代码写的光圈转动声、快门「咔嚓」、远处一声教堂钟。
+
+## 六、最难的一段：Omia 怎么出场
+片子的最后，要从「人类看见了这么多」落到 Omia。这一段改了很多次。
+
+![配图](https://mmbiz.qpic.cn/mmbiz_jpg/7sJ3tx6734Vw2iaalBpx9NaqAR3lk5KXhBiaqS2aicvRFibClaowXxwjicrJ5PaibNaLy0rgX3JMteYFFC7OZSoibClA3eWFmf6w6iaCyYibvmcqM9A8/640?from=appmsg)
+第一次，墙上投出了真的 Omia 软件界面，旁边还站着一个 AI 生成的小孩。我看完的反应是：
+这里出现 Omia 真实的东西，就全片垮掉的感觉。 这个小孩看起来也有点可怕。
+我想要的是：
+这个部分还是应该比较意向的表达。代码啊，3 维啊，音乐啊，数学啊，动画啊，各种什么的都被 Omia 收纳在一个框里，规整的呈现。不能截图，不能弄真 Omia 的感觉，logo 可以特效展示。
+就是前面讲了人看了这么多东西，最后现在是各种东西都在墙上，但是有个 Omia 可以帮你清爽的收纳着看，帮助你好好看、学习掌握的这么个意思。
+
+![配图](https://mmbiz.qpic.cn/mmbiz_jpg/7sJ3tx6734VI1Sk2zKqKhHhqK7fkArncuQKyrTDuC0VZ2JtauAiaUsEfbqrYdKnFtZKtNDAFr3ZbJRcGZHLAnG21zIxjv7iaGYYrfM5JvMB3U/640?from=appmsg)
+第二次，文件收进了框里，但太少了，只占了一半。我说要「很多很多很多文件，各种的」。
+第三次就是现在的样子：
+
+![配图](https://mmbiz.qpic.cn/sz_mmbiz_jpg/7sJ3tx6734UFqWVsMa3qheiax3zia53ZvKGmOicIjRriar1wdK94qDwFeWZx2mTNtIlxNMv6EUGwa8sV27jnPXFuibTkDdibGhGdbqdtricpzWXZib8/640?from=appmsg)
+
+## 七、最后一个画面
+
+![配图](https://mmbiz.qpic.cn/sz_mmbiz_jpg/7sJ3tx6734UbsIoNaG8QzWMZ5kCUXSQOAiaaicbFedEnkKrA1eb6QjUjTchlV8FQrBTO2Nsry4r8O7yRoj3lSvibgejRADf3CBoN0MIHSf6jb4/640?from=appmsg)
+落版是那枚黄铜光圈。AI 生成的视频里，光圈叶片变形了，「多一坨」；改回油画静帧后又太静，我要光有点动效；加了一圈放射的光芒，我又觉得不对：
+就是一些光照灰尘漂浮，可能更优雅点。
+现在就是：光在光圈里一呼一吸，细小的灰尘在光里漂。
+
+![配图](https://mmbiz.qpic.cn/mmbiz_jpg/7sJ3tx6734WdwmMiaY72OsXGzlS13onQF8m7t8tcXZtDVzlYBEsOfYm4ECGljqyqtia0ZAF5buTUOEWtNbklDXgTpqYV6htHgcwj7ic1QYibpPo/640?from=appmsg)
+
+## 八、倒带：这部片子的技术框架
+用倒带学习法把整个过程倒回去看，技术上其实就三层：
+框架：画 → 动 → 准
+这个表格，你可以看到，有代码～～
+正常工作流：图生视频 ➡️  剪辑在一起 ➡️ 配音卡点
+但是opus能让 画面/细节/音乐/音效 卡得完美！！！！
+因为他拿着代码把整个流程拆成了帧的级别
+技术核心：把「视频」变成「代码」
+传统做视频是在剪辑软件里拖素材；这部片子换了个思路：每一帧画面，都是一个关于时间的函数。
+打个比方，普通视频像一卷拍好的胶片，每一格都已经定死了；这部片子更像一份乐谱，你告诉它「现在是第 12.4 秒」，它就当场把这一秒该有的画面演奏出来。
+具体怎么做的/Claude写的：
+1、Opus 写了一个网页，网页里只有一个核心函数 render(t)：给它一个时间 t，它就在浏览器的画布上把这一刻画出来：先铺底图，再叠 AI 视频帧，再画金线、字幕、光尘。
+2、再用 Playwright（一个能自动操控浏览器的工具）打开这个网页，从第 0 秒开始，每隔 1/30 秒调用一次 render，截一张图。
+3、5430 张图交给 ffmpeg（开源的视频处理工具），拼成视频，混进声音
+这个思路带来三个好处：
+1. 可以被「写」出来。Opus 最擅长的就是写代码，一旦视频变成了代码，它就能直接创作，不需要会用任何剪辑软件
+2. 精确。画面只由时间决定，同一个 t 永远画出同一帧。所以可以 4 个浏览器同时渲不同的段落，这台 M5 上整片约 3 分钟渲完
+3. 可修改。你说「这里要改」，改的是几行代码或几个数字，重渲就行，不用重新拍、重新剪
+剪辑：一份时间表，管住所有东西
+所有的「时间」都写在一份叫 timeline.json 的文件里：每个镜头从第几秒到第几秒、每句旁白几点开口、每个音效几点响。画面、字幕、配乐、音效全都从这份文件里读时间，只要改一个数字，所有东西会一起跟着动，不会出现画面改了、字幕没跟上的情况。
+几个剪辑手法在代码里是这么实现的：
+A、 叠化：两个镜头重叠 1.2 秒，后一个的透明度从 0 慢慢升到 1。用的是缓动曲线（开头慢、中间快、结尾慢），所以过渡是柔的，不是线性的生硬过渡
+B、 镜头运动：镜头就是三个数：看向画面的哪个点（横、纵坐标），以及放大几倍。推、拉、摇，都是让这三个数随时间变化
+C、 同一个房间的延时：七个年代共用一条镜头函数，前后两个镜头在叠化的那一刻机位完全一样，所以只有时代在变，房间纹丝不动
+D、 光的对位转场：先量出光圈中心在画面里的坐标，和夜景里那扇窗的坐标。前一个镜头推进光圈中心放大 7 倍，后一个镜头从窗户放大 9 倍开始往回退。两团光在屏幕正中重合，看起来就像同一个光源
+让 AI 视频听话：两个数学工具
+A、钉回原画：AI 生成的视频会偷偷推近、平移。Opus 写了一个程序，在每一帧里找几千个特征点（比如窗框的角、桌子的边），和原油画上的同一批点配对，算出一个「变形矩阵」（单应矩阵），把这一帧扭正回原画的位置。所以后面叠上去的金线和说明牌永远对得准；
+B、立体感：用一个深度估计模型（Depth Anything）算出画里每个像素离镜头多远。镜头移动时，在显卡上用一小段着色器，让近的像素挪得多、远的挪得少，平面的画就有了纵深；
+音画卡点：先知道每个字在第几秒
+卡点的前提，是知道声音里每一件事发生在哪一秒：
+A、旁白：每句旁白生成后，用语音识别模型（whisper）听写回来，拿到每句话的起止时间，再把字幕、画面动作都挂在这些时间点上。比如「We opened our eyes」开口的那一刻，Seedance 视频里的眼睛刚好睁开；念到「每一页」「每一张图纸」时，对应的画面正好飞进光圈
+B、音效：有一份音效清单，每一条写着「什么声音、第几秒、多大声」：光圈合上那一帧放快门声，文件落进格子那一帧放「嗒」
+C、配乐：Lyria 一次生成五版，Opus 把每一版逐秒测响度，画成一条起伏曲线，挑出高潮刚好落在片名出现那一刻的那一版
+D、不让音乐盖住人声：有旁白的地方，配乐自动降低四成，用接近一秒的慢速起落，听起来是音乐在「让路」，而不是忽大忽小
+E、拆开声音：用人声分离模型（demucs）把 AI 配乐里偷偷混进的人声去掉；用谐波和打击分离（HPSS），把 AI 视频自带声音里的背景音乐拿掉，只留下火声、水声
+为什么是 Opus 能做成
+把这些串起来，靠的是 Opus 四个能力叠在一起：
+1. 会写代码：画布绘图、显卡着色器、图像配准、音频处理，从前端到算法都能写
+2. 能看图：每次改完，它先把关键帧截下来自己看，发现重影、黑场、字幕压字、文件框只铺了一半，先修好再交给我
+3. 会用工具：它能直接在电脑上运行命令，调 ffmpeg、跑 Python、操控浏览器、调用各家 AI 模型的接口，还能远程用我 Windows 电脑上的显卡生成配音
+4. 记得住整个项目：几十个文件、上千行代码、五个版本里我说过的每一句修改意见，它都能同时记在上下文里，改一处时知道会牵动哪几处
+所以这不是「AI 一键生成视频」，而是 Opus 搭了一整条生产线：写代码、渲染、自己检查、按我的意见返工，一轮一轮做了五个版本。
+一些真实数字：
+
+## 十、还能怎么用
+这套做法不只能做宣传片：
+
+## 十一、我估计你们要这个，GitHub 资源推荐
+我单独建了一个“代码片场”，里面乱七八糟堆了一些skill～
+全都分享出来：做 AI 视频 / 代码视频的朋友也许用得上哦
+这个样子看起来我这个文章要被限流了～～
+这次直接用到的
+我的「代码片场」里收录、学过的
+值得翻的工具和合集
+【以上这些只是截止今天的，我会更新一些opus的工具，大家可以关注我的推 @xiaoerzhan】
+但是真的真的，核心还是自己的审美和想法，我最近爱看一些老电影，比如《傲慢与偏见》，就是这里的每个镜头，每个细节，每个设计，都让我明白好的东西长什么样子，去和AI一起创作，找到感动，找到人味会更有乐趣。

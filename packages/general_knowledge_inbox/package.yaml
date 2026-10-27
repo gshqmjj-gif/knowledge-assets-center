@@ -1,0 +1,25 @@
+id: general_knowledge_inbox
+name: 通用知识与综合收藏
+description: 新收藏待归档或跨领域的综合知识资产汇总
+domain: general_inbox
+domain_name: 通用知识与综合收藏
+domain_icon: 📥
+tags:
+- AI
+- 通用知识
+- 微信公众号
+- EARS
+- 待归档
+created_at: '2026-10-26 20:53:07'
+updated_at: '2026-10-26 20:53:07'
+item_count: 1
+sources:
+- id: wechat_article_20261026_Opus_5.5，你竟然这样做视频～！
+  title: Opus 5.5，你竟然这样做视频～！
+  type: wechat_article
+  url: https://mp.weixin.qq.com/s/jZwxMX9nWsD0abzrPWe0Ig
+  author: EARS
+  file: sources/20261026_wechat_article_Opus_5.5，你竟然这样做视频～！.md
+  ingested_at: '2026-10-26 20:53:07'
+  keyframes_count: 0
+  snippets_count: 0
