@@ -5,14 +5,31 @@ domain: ai_tech
 domain_name: AI科技与大模型
 domain_icon: 🤖
 tags:
-- AI视频
-- Opus 5.5
-- 多模态
 - 创意工作流
+- 洛克AI
+- Opus 5.5
+- 开源项目
+- ai_tech
+- AI视频
+- OpenMontage
+- B站精选
+- ai_video
+- 多模态
 created_at: '2026-10-26 22:50:20'
-updated_at: '2026-10-26 22:50:20'
-item_count: 1
+updated_at: '2026-10-27 05:28:02'
+item_count: 2
 sources:
+- id: bilibili_video_20261027_OpenMontage：把_AI_编程助手变成视频工作室
+  title: OpenMontage：把 AI 编程助手变成视频工作室
+  type: bilibili_video
+  url: https://www.bilibili.com/video/BV1UAn36aEX3?t=219
+  author: 洛克AI
+  file: sources/20261027_bilibili_video_OpenMontage：把_AI_编程助手变成视频工作室.md
+  ingested_at: '2026-10-27 05:28:01'
+  keyframes_count: 2
+  snippets_count: 1
+  associated_entity: Codex
+  incremental_merged: false
 - id: wechat_article_20261026_Opus_5.5，你竟然这样做视频～！
   title: Opus 5.5，你竟然这样做视频～！
   type: wechat_article
@@ -48,4 +65,28 @@ knowledge_matrix:
   key_insights: []
   sources_contributed:
   - EARS
+  merged_sources_count: 1
+- entity_name: Codex
+  domain: ai_tech
+  archetype: creative_multimodal
+  core_function: '核心解决痛点: 把 AI 编程助手变成视频工作室；装上之后你的 AI 能多做什么: 把 AI 编程助手变成视频工作室，显著突破传统工作流瓶颈。'
+  hardware_specs: '硬件要求: 推荐 8GB+ 内存，支持 Apple Silicon / NVIDIA GPU 加速 / 运行环境: FFmpeg
+    6.0+ + Node.js 18+ + Python 3.10+'
+  environment: '硬件要求: 推荐 8GB+ 内存，支持 Apple Silicon / NVIDIA GPU 加速 + 运行环境: FFmpeg 6.0+
+    + Node.js 18+ + Python 3.10+'
+  local_deployable: '本地化支持: 🟢 100% 本地流转 (视频切片、音频转录与字幕合成全程在本地磁盘完成，隐私严守)'
+  competitive_advantages:
+  - 【全自动视频工作流】原始素材进、高光成片出，彻底告别繁琐手动拖拽时间线。
+  - 【声画联合分析】基于 Whisper 逐字稿与画面关键帧联合锚定高光，对齐精确至毫秒级。
+  - 【工业工程文件直出】支持导出 Premiere / Final Cut Pro 工程文件，方便进一步微调。
+  limitations_and_pitfalls:
+  - 【合规红线】严格限定合法学习或授权复刻，严禁对明确禁止逆向或商业加密混淆做对抗。
+  - 【环境排错】涉及多工具串联，遇到报错应保留完整日志并逐项单点排查，切忌全量同时修改。
+  - 【复刻边界】切忌盲目原样搬运代码或素材；复刻核心在于摸清行为逻辑后独立自研重写。
+  - 【安全界限】自动化工具仅提供初步扫描，业务逻辑漏洞与敏感权限仍需人工专项复核。
+  quickstart_commands:
+  - git clone https://github.com/calesthio/OpenMontage
+  key_insights: []
+  sources_contributed:
+  - 洛克AI
   merged_sources_count: 1

@@ -57,9 +57,26 @@ PRIMARY_DOMAINS = {
                 "keywords": ["agent", "智能体", "mcp", "工作流", "langchain", "autogen", "crewai", "prompt", "提示词"]
             },
             "local_llm": {
-                "name": "本地大模型与知识库RAG",
+                "name": "本地大模型与端侧推理优化",
                 "icon": "🧠",
-                "keywords": ["本地", "ollama", "rag", "知识库", "微调", "vllm", "llama", "私有化", "embedding", "向量检索"]
+                "keywords": ["本地", "ollama", "rag", "知识库", "微调", "vllm", "llama", "airllm", "显存", "端侧", "推理优化", "私有化", "embedding", "向量检索"]
+            },
+            "visual_design": {
+                "name": "架构可视化与技术图解",
+                "icon": "📊",
+                "keywords": ["图解", "架构图", "diagram", "时序图", "流程图", "excalidraw", "mermaid", "svg", "图解规矩", "视觉呈现"]
+            }
+        }
+    },
+    "productivity": {
+        "name": "知识生产力与办公自动化",
+        "icon": "📑",
+        "aliases": ["生产力", "办公", "效率", "插件", "工作流", "productivity", "office"],
+        "sub_categories": {
+            "work_automation": {
+                "name": "岗位工作流与企业自动化插件",
+                "icon": "⚡",
+                "keywords": ["岗位插件", "工作流", "自动化", "cowork", "企业级", "提示词规范", "知识工作者", "业务流程", "plugins"]
             }
         }
     },
@@ -91,9 +108,9 @@ PRIMARY_DOMAINS = {
         "aliases": ["建筑", "空间", "室内", "空间计算", "bim", "architecture", "arch"],
         "sub_categories": {
             "parametric_design": {
-                "name": "参数化算法与立面推演",
+                "name": "参数化算法与工业CAD",
                 "icon": "📐",
-                "keywords": ["参数化", "grasshopper", "rhino", "幕墙", "立面", "几何算法", "python for rhino"]
+                "keywords": ["参数化", "cad", "text-to-cad", "3d零件", "工程图", "grasshopper", "rhino", "幕墙", "立面", "可制造性", "cnc", "3d打印"]
             },
             "bim_automation": {
                 "name": "BIM自动化与施工流转",
@@ -140,9 +157,9 @@ PRIMARY_DOMAINS = {
                 "keywords": ["爬虫", "逆向抓包", "playwright", "selenium", "自动化", "anti-bot", "charles", "frida"]
             },
             "backend_arch": {
-                "name": "高并发系统与微服务架构",
+                "name": "高并发系统与云原生SRE运维",
                 "icon": "⚡",
-                "keywords": ["后端", "fastapi", "docker", "k8s", "redis", "postgres", "微服务", "消息队列", "并发"]
+                "keywords": ["后端", "sre", "opensre", "故障排查", "运维", "prometheus", "可观测性", "rca", "监控", "fastapi", "docker", "k8s", "redis", "postgres", "微服务", "并发"]
             },
             "frontend_ui": {
                 "name": "前端交互与现代组件工程",

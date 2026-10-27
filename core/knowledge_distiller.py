@@ -132,7 +132,33 @@ class KnowledgeDistiller:
             return "ai_project"
         return "general_tech"
 
+    def _extract_section_bullets(self, text: str, header_keywords: List[str]) -> List[str]:
+        """从标准 Markdown 小节中提取结构化要点列表"""
+        lines = text.splitlines()
+        capturing = False
+        bullets = []
+        for line in lines:
+            if line.startswith("#"):
+                header_text = line.lower()
+                if any(k.lower() in header_text for k in header_keywords):
+                    capturing = True
+                    continue
+                elif capturing:
+                    break
+            elif capturing:
+                stripped = line.strip()
+                if stripped.startswith(("-", "*", "•", "1.", "2.", "3.", "4.")):
+                    clean_b = re.sub(r'^[\-\*•\d\.]+\s*', '', stripped)
+                    clean_b = re.sub(r'(\*\*|\*|`|\[.*?\]\(.*?\))', '', clean_b).strip()
+                    if len(clean_b) > 6:
+                        bullets.append(clean_b)
+        return bullets
+
     def _extract_core_function(self, title: str, text: str, entity_name: str) -> str:
+        sec_bullets = self._extract_section_bullets(text, ["核心功能", "解决痛点", "技术定位", "是干什么的"])
+        if sec_bullets:
+            return "；".join(sec_bullets[:2])
+
         sents = self._split_into_valid_sentences(text)
         for s in sents:
             if any(k in s for k in ["把 REA、Reverse-skill、PentAGI 这三个", "自动化流水线", "负责把工具备齐", "先让 AI 去查它是怎么实现的", "看到一个软件功能"]):
@@ -142,6 +168,10 @@ class KnowledgeDistiller:
         return f"围绕 {entity_name} 打造的全自动化逻辑推演与工程实现工作流"
 
     def _extract_hardware_specs(self, text: str) -> str:
+        sec_bullets = self._extract_section_bullets(text, ["硬件配置", "显存要求", "配置环境", "hardware"])
+        if sec_bullets:
+            return " / ".join(sec_bullets[:2])
+
         specs = []
         gpu_match = re.search(r'(\d+G\s*显存|RTX\s*\d{4}|VRAM|\d+GB\s*显存)', text, re.I)
         if gpu_match:
@@ -162,6 +192,10 @@ class KnowledgeDistiller:
         return "标准机器配置 (8G 内存即可无痛运行)"
 
     def _extract_environment(self, text: str) -> str:
+        sec_bullets = self._extract_section_bullets(text, ["运行环境", "依赖环境", "所需工具", "environment"])
+        if sec_bullets:
+            return " + ".join(sec_bullets[:3])
+
         env_items = []
         lower = text.lower()
         if "docker" in lower:
@@ -184,6 +218,10 @@ class KnowledgeDistiller:
         return " + ".join(env_items) if env_items else "跨平台标准环境 (支持 macOS / Linux / Windows)"
 
     def _extract_local_deployability(self, text: str) -> str:
+        sec_bullets = self._extract_section_bullets(text, ["本地运行", "纯本地", "安全边界", "私有化"])
+        if sec_bullets:
+            return sec_bullets[0]
+
         lower = text.lower()
         if "纯本地" in text or "无需联网" in text:
             return "🟢 100% 纯本地离线运行 (无需外网，数据完全私有安全)"
@@ -194,13 +232,10 @@ class KnowledgeDistiller:
         return "🟢 本地命令行/独立工具 (无强联网依赖)"
 
     def _extract_advantages(self, text: str, title: str) -> List[str]:
-        """
-        同类核心优势：按四个专业维度提炼完整、通顺、不重复的要点
-        1. 社区背书与工业成熟度
-        2. 证据链溯源与可解释性
-        3. 推演自研而非机械照抄
-        4. 全流程端到端自动化
-        """
+        sec_bullets = self._extract_section_bullets(text, ["优势", "对比", "特点", "亮点", "advantage"])
+        if sec_bullets and len(sec_bullets) >= 2:
+            return sec_bullets[:4]
+
         advantages = []
         sents = self._split_into_valid_sentences(text)
 
@@ -235,13 +270,10 @@ class KnowledgeDistiller:
         return advantages[:4]
 
     def _extract_pitfalls(self, text: str, title: str) -> List[str]:
-        """
-        劣势、边界与避坑要点：按四个清晰维度提炼完整、无重复、通顺的规范要点
-        1. 合规法律与反混淆对抗红线
-        2. 工具依赖与运行环境配置坑
-        3. 目标范围与代码复刻方式
-        4. 安全检测范围与上线风险
-        """
+        sec_bullets = self._extract_section_bullets(text, ["劣势", "避坑", "边界", "注意", "限制", "风险", "pitfall"])
+        if sec_bullets and len(sec_bullets) >= 2:
+            return sec_bullets[:4]
+
         pitfalls = []
         sents = self._split_into_valid_sentences(text)
 

@@ -179,27 +179,39 @@ class KnowledgePackageManager:
         preferred_sub_category: Optional[str] = None
     ) -> str:
         """
-        智能多级归类路由：根据领域偏好、子方向与关键词密度，将知识路由到最适合的资产包
+        智能多级归类路由：根据实体元数据、领域偏好、子方向与关键词密度，将知识精准路由到最适合的资产包
         """
-        search_blob = f"{item.title} {item.summary} {' '.join(item.tags)} {item.content_markdown[:800]}".lower()
+        meta_dict = getattr(item, "metadata", {}) or {}
+        target_pkg = preferred_package or meta_dict.get("preferred_package")
+        target_domain = preferred_domain or meta_dict.get("domain")
+        target_sub_cat = preferred_sub_category or meta_dict.get("sub_category")
 
-        # 1. 用户显式指定了资产包
-        if preferred_package:
-            pkg_id = re.sub(r'[^a-zA-Z0-9_\-]', '_', preferred_package).lower().strip('_')
-            if not (self.packages_dir / pkg_id).exists():
-                domain_val = preferred_domain or "inbox"
-                sub_id, _ = resolve_sub_category(domain_val, search_blob)
-                self.create_package(pkg_id, name=preferred_package, domain=domain_val, sub_category=sub_id)
-            return pkg_id
+        search_blob = f"{item.title} {item.summary} {' '.join(item.tags)} {item.content_markdown[:1000]}".lower()
 
-        # 2. 用户指定了一级领域与子方向
-        if preferred_domain:
-            domain_key = resolve_domain(preferred_domain)
-            sub_id = preferred_sub_category
+        # 1. 显式指定了资产包
+        if target_pkg:
+            clean_pkg_id = re.sub(r'[^a-zA-Z0-9_\-]', '_', target_pkg).lower().strip('_')
+            # 若已存在同名资产包直接返回
+            if (self.packages_dir / clean_pkg_id).exists():
+                return clean_pkg_id
+            for p in self.list_packages():
+                if p.get("id") == clean_pkg_id or p.get("name") == target_pkg:
+                    return p.get("id")
+            
+            # 若不存在则创建
+            domain_val = target_domain or "inbox"
+            sub_id, _ = resolve_sub_category(domain_val, search_blob)
+            self.create_package(clean_pkg_id, name=target_pkg, domain=domain_val, sub_category=sub_id)
+            return clean_pkg_id
+
+        # 2. 显式指定了一级领域与子方向 (或从 item.metadata 读取)
+        if target_domain:
+            domain_key = resolve_domain(target_domain)
+            sub_id = target_sub_cat
             if not sub_id:
                 sub_id, sub_name = resolve_sub_category(domain_key, search_blob)
             
-            # 查找该领域与子方向下是否已有对应资产包
+            # 优先复用该子方向已有资产包
             for pkg in self.list_packages():
                 if pkg.get("domain") == domain_key and pkg.get("sub_category") == sub_id:
                     return pkg.get("id")
@@ -212,60 +224,57 @@ class KnowledgePackageManager:
                 self.create_package(
                     package_id=new_pkg_id,
                     name=f"{sub_name}知识资产包",
-                    description=f"{dom_info['name']} > {sub_name} 专题领域知识沉淀",
+                    description=f"{dom_info['name']} > {sub_name} 专题领域沉淀",
                     domain=domain_key,
                     sub_category=sub_id,
                     tags=[dom_info['name'], sub_name]
                 )
             return new_pkg_id
 
-        # 3. 全局自动匹配：优先匹配已有资产包
-        existing_packages = self.list_packages()
-        best_pkg = None
-        best_score = 0
-        for pkg in existing_packages:
-            score = 0
-            pkg_name = pkg.get("name", "").lower()
-            pkg_tags = [t.lower() for t in pkg.get("tags", [])]
-            if pkg_name in search_blob:
-                score += 5
-            for tag in pkg_tags:
-                if tag in search_blob:
-                    score += 2
-            if score > best_score:
-                best_score = score
-                best_pkg = pkg.get("id")
+        # 3. 智能语义加权匹配：先精准识别所属子方向与一级领域
+        best_domain_key = None
+        best_sub_id = None
+        highest_score = 0
 
-        if best_pkg and best_score >= 4:
-            return best_pkg
+        for dom_key, dom_data in PRIMARY_DOMAINS.items():
+            if dom_key == "inbox":
+                continue
+            for sub_key, sub_data in dom_data.get("sub_categories", {}).items():
+                score = 0
+                for kw in sub_data.get("keywords", []):
+                    kw_lower = kw.lower()
+                    if kw_lower in search_blob:
+                        # 核心关键词在标题或标签中权重翻倍
+                        weight = 3 if (kw_lower in item.title.lower() or any(kw_lower in t.lower() for t in item.tags)) else 1
+                        score += weight
+                if score > highest_score:
+                    highest_score = score
+                    best_domain_key = dom_key
+                    best_sub_id = sub_key
 
-        # 4. 其次自动匹配一级领域与二级子方向
-        best_domain = None
-        domain_max_matches = 0
-        for domain_key, info in PRIMARY_DOMAINS.items():
-            matches = 0
-            for sub_id, sub_info in info.get("sub_categories", {}).items():
-                matches += sum(1 for kw in sub_info.get("keywords", []) if kw.lower() in search_blob)
-            if matches > domain_max_matches:
-                domain_max_matches = matches
-                best_domain = (domain_key, info)
+        # 若命中特定子方向 (得分 >= 2)
+        if best_domain_key and best_sub_id and highest_score >= 2:
+            # 优先寻找该子方向已有资产包
+            for pkg in self.list_packages():
+                if pkg.get("domain") == best_domain_key and pkg.get("sub_category") == best_sub_id:
+                    return pkg.get("id")
 
-        if best_domain and domain_max_matches >= 2:
-            domain_key, info = best_domain
-            sub_id, sub_name = resolve_sub_category(domain_key, search_blob)
-            target_id = f"{domain_key}_{sub_id}"
-            if not (self.packages_dir / target_id).exists():
+            # 否则创建专属资产包
+            dom_info = PRIMARY_DOMAINS.get(best_domain_key, PRIMARY_DOMAINS["inbox"])
+            sub_name = dom_info.get("sub_categories", {}).get(best_sub_id, {}).get("name", best_sub_id)
+            new_pkg_id = f"{best_domain_key}_{best_sub_id}"
+            if not (self.packages_dir / new_pkg_id).exists():
                 self.create_package(
-                    package_id=target_id,
+                    package_id=new_pkg_id,
                     name=f"{sub_name}知识资产包",
-                    description=f"{info['name']} > {sub_name} 专题领域沉淀",
-                    domain=domain_key,
-                    sub_category=sub_id,
-                    tags=[info['name'], sub_name]
+                    description=f"{dom_info['name']} > {sub_name} 专题领域知识沉淀",
+                    domain=best_domain_key,
+                    sub_category=best_sub_id,
+                    tags=[dom_info['name'], sub_name]
                 )
-            return target_id
+            return new_pkg_id
 
-        # 5. 兜底通用收件箱
+        # 4. 兜底通用收件箱
         fallback_id = "inbox_quick_capture"
         if not (self.packages_dir / fallback_id).exists():
             self.create_package(
