@@ -1,7 +1,7 @@
-# 知识资产包：engineering_sre_devops
+# 知识资产包：云原生AI智能运维中台 (OpenSRE)
 > **资产包标识**: `engineering_sre_devops` | **一级领域**: ⚙️ 全栈工程与系统研发
 > **收录资源数**: 1 篇/条 | **沉淀知识实体**: 1 个 | **更新时间**: 2026-10-27 05:28:02
-> **定位阐述**: engineering_sre_devops 相关知识沉淀与实战资产包
+> **定位阐述**: 线上突发故障自主排查、假设验证与自愈Agent
 
 ---
 ## 🌟 核心技术与工程特性对比矩阵 (Structured Knowledge Matrix)

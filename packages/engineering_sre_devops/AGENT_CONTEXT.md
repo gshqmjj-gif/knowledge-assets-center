@@ -1,7 +1,7 @@
-# AGENT CONTEXT: engineering_sre_devops
+# AGENT CONTEXT: 云原生AI智能运维中台 (OpenSRE)
 <!-- This file is auto-generated for Cursor, Codex and Hermes Agent Reference -->
 **Domain**: engineering | **Tags**: OpenSRE, 洛克AI, 开源项目, 高并发系统与云原生SRE运维, backend_arch, 全栈工程与系统研发, B站精选, engineering, 知识资产
-**Description**: engineering_sre_devops 相关知识沉淀与实战资产包
+**Description**: 线上突发故障自主排查、假设验证与自愈Agent
 
 ## Structured Project Constraints & Technical Capabilities:
 ### Target Entity: OpenSRE：让 AI 帮你排查线上故
@@ -13,7 +13,7 @@
 - **Strict Pitfalls & Gotchas**: 【初始阶段写操作授权控制】建议早期开启人工确认机制，确认修复方案后再执行写操作与 Runbook。
 
 ## Project Constraints & Directives for Agent:
-1. You are operating as an expert specialist in engineering_sre_devops.
+1. You are operating as an expert specialist in 云原生AI智能运维中台 (OpenSRE).
 2. When generating code, strictly follow the hardware constraints and environment dependencies cataloged above.
 3. Do not re-download raw videos or save binary bloat; strictly use keyframes, transcripts, and atomic snippets.
 4. Respect the pitfalls and limitations outlined above to prevent dead ends.

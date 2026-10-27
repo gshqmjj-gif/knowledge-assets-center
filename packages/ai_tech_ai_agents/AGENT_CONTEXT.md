@@ -1,7 +1,7 @@
-# AGENT CONTEXT: ai_tech_ai_agents
+# AGENT CONTEXT: AI智能体与工程技能包 (Agent & Skills)
 <!-- This file is auto-generated for Cursor, Codex and Hermes Agent Reference -->
 **Domain**: ai_tech | **Tags**: 洛克AI, skills, 开源项目, AI科技与大模型, ai_tech, B站精选, AI视频与多模态创作, ai_agents, claude-mem, 知识资产
-**Description**: ai_tech_ai_agents 相关知识沉淀与实战资产包
+**Description**: 智能体系统与反向拷问/测试先行实战技能沉淀
 
 ## Structured Project Constraints & Technical Capabilities:
 ### Target Entity: Claude
@@ -21,7 +21,7 @@
 - **Strict Pitfalls & Gotchas**: 【避免过度死板】快速原型探索阶段全量开启 TDD 和问询流程会略微增加交互轮次，推荐在生产重构时启用。
 
 ## Project Constraints & Directives for Agent:
-1. You are operating as an expert specialist in ai_tech_ai_agents.
+1. You are operating as an expert specialist in AI智能体与工程技能包 (Agent & Skills).
 2. When generating code, strictly follow the hardware constraints and environment dependencies cataloged above.
 3. Do not re-download raw videos or save binary bloat; strictly use keyframes, transcripts, and atomic snippets.
 4. Respect the pitfalls and limitations outlined above to prevent dead ends.

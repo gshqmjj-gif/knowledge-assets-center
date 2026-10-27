@@ -1,7 +1,7 @@
-# AGENT CONTEXT: architecture_parametric_cad
+# AGENT CONTEXT: 自然语言参数化工业CAD (Text-to-CAD)
 <!-- This file is auto-generated for Cursor, Codex and Hermes Agent Reference -->
 **Domain**: architecture | **Tags**: parametric_design, 洛克AI, 开源项目, architecture, B站精选, text-to-cad, 建筑设计与空间计算, 参数化算法与工业CAD, 知识资产
-**Description**: architecture_parametric_cad 相关知识沉淀与实战资产包
+**Description**: 一句话生成工业级可加工3D实体与尺寸工程图
 
 ## Structured Project Constraints & Technical Capabilities:
 ### Target Entity: text-to-cad：一句话生成能加工
@@ -13,7 +13,7 @@
 - **Strict Pitfalls & Gotchas**: 【复杂曲面边界】当前最擅长规则机械零件与参数化装配体；极度复杂的自由流体有机曲面仍需手工建模配合。
 
 ## Project Constraints & Directives for Agent:
-1. You are operating as an expert specialist in architecture_parametric_cad.
+1. You are operating as an expert specialist in 自然语言参数化工业CAD (Text-to-CAD).
 2. When generating code, strictly follow the hardware constraints and environment dependencies cataloged above.
 3. Do not re-download raw videos or save binary bloat; strictly use keyframes, transcripts, and atomic snippets.
 4. Respect the pitfalls and limitations outlined above to prevent dead ends.

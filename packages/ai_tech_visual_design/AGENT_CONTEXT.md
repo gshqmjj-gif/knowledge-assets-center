@@ -1,7 +1,7 @@
-# AGENT CONTEXT: ai_tech_visual_design
+# AGENT CONTEXT: 架构可视化与出版级图解 (Diagram Design)
 <!-- This file is auto-generated for Cursor, Codex and Hermes Agent Reference -->
 **Domain**: ai_tech | **Tags**: diagram-design, 架构可视化与技术图解, 洛克AI, 开源项目, AI科技与大模型, visual_design, ai_tech, B站精选, 知识资产
-**Description**: ai_tech_visual_design 相关知识沉淀与实战资产包
+**Description**: 45种工程图解设计规范与专业SVG渲染
 
 ## Structured Project Constraints & Technical Capabilities:
 ### Target Entity: diagram-design：一句话让 
@@ -13,7 +13,7 @@
 - **Strict Pitfalls & Gotchas**: 【单图复杂度控制】单张图节点数超过 50 个时建议拆解为分层架构图，避免信息密度过高导致排版挤压。
 
 ## Project Constraints & Directives for Agent:
-1. You are operating as an expert specialist in ai_tech_visual_design.
+1. You are operating as an expert specialist in 架构可视化与出版级图解 (Diagram Design).
 2. When generating code, strictly follow the hardware constraints and environment dependencies cataloged above.
 3. Do not re-download raw videos or save binary bloat; strictly use keyframes, transcripts, and atomic snippets.
 4. Respect the pitfalls and limitations outlined above to prevent dead ends.

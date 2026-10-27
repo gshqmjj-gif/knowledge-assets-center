@@ -1,6 +1,6 @@
 id: productivity_workflow_plugins
-name: productivity_workflow_plugins
-description: productivity_workflow_plugins 相关知识沉淀与实战资产包
+name: 专业岗位业务自动化插件 (Work Plugins)
+description: Anthropic 官方开源11大岗位标准化工作流
 domain: productivity
 domain_name: 知识生产力与办公自动化
 domain_icon: 📑

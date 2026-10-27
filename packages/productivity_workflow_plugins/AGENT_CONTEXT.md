@@ -1,7 +1,7 @@
-# AGENT CONTEXT: productivity_workflow_plugins
+# AGENT CONTEXT: 专业岗位业务自动化插件 (Work Plugins)
 <!-- This file is auto-generated for Cursor, Codex and Hermes Agent Reference -->
 **Domain**: productivity | **Tags**: 岗位工作流与企业自动化插件, 洛克AI, work_automation, 知识生产力与办公自动化, 开源项目, knowledge-work-plugins, B站精选, productivity, 知识资产
-**Description**: productivity_workflow_plugins 相关知识沉淀与实战资产包
+**Description**: Anthropic 官方开源11大岗位标准化工作流
 
 ## Structured Project Constraints & Technical Capabilities:
 ### Target Entity: knowledge-work-plugi
@@ -13,7 +13,7 @@
 - **Strict Pitfalls & Gotchas**: 【需注入企业私有先验】开箱即用模版提供框架骨架，要发挥最大价值需在配置中填入团队专属业务指标。
 
 ## Project Constraints & Directives for Agent:
-1. You are operating as an expert specialist in productivity_workflow_plugins.
+1. You are operating as an expert specialist in 专业岗位业务自动化插件 (Work Plugins).
 2. When generating code, strictly follow the hardware constraints and environment dependencies cataloged above.
 3. Do not re-download raw videos or save binary bloat; strictly use keyframes, transcripts, and atomic snippets.
 4. Respect the pitfalls and limitations outlined above to prevent dead ends.

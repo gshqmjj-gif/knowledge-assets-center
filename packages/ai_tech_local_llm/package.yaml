@@ -1,6 +1,6 @@
 id: ai_tech_local_llm
-name: ai_tech_local_llm
-description: ai_tech_local_llm 相关知识沉淀与实战资产包
+name: 端侧推理与极限显存优化 (AirLLM & FreeLLM)
+description: 4G显存跑大模型与本地免费编程代理网关
 domain: ai_tech
 domain_name: AI科技与大模型
 domain_icon: 🤖

@@ -1,6 +1,6 @@
 id: engineering_sre_devops
-name: engineering_sre_devops
-description: engineering_sre_devops 相关知识沉淀与实战资产包
+name: 云原生AI智能运维中台 (OpenSRE)
+description: 线上突发故障自主排查、假设验证与自愈Agent
 domain: engineering
 domain_name: 全栈工程与系统研发
 domain_icon: ⚙️

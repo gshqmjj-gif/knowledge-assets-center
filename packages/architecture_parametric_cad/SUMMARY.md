@@ -1,7 +1,7 @@
-# 知识资产包：architecture_parametric_cad
+# 知识资产包：自然语言参数化工业CAD (Text-to-CAD)
 > **资产包标识**: `architecture_parametric_cad` | **一级领域**: 🏛️ 建筑设计与空间计算
 > **收录资源数**: 1 篇/条 | **沉淀知识实体**: 1 个 | **更新时间**: 2026-10-27 05:28:02
-> **定位阐述**: architecture_parametric_cad 相关知识沉淀与实战资产包
+> **定位阐述**: 一句话生成工业级可加工3D实体与尺寸工程图
 
 ---
 ## 🌟 核心技术与工程特性对比矩阵 (Structured Knowledge Matrix)

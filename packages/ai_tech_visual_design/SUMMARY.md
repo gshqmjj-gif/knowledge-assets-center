@@ -1,7 +1,7 @@
-# 知识资产包：ai_tech_visual_design
+# 知识资产包：架构可视化与出版级图解 (Diagram Design)
 > **资产包标识**: `ai_tech_visual_design` | **一级领域**: 🤖 AI科技与大模型
 > **收录资源数**: 1 篇/条 | **沉淀知识实体**: 1 个 | **更新时间**: 2026-10-27 05:28:02
-> **定位阐述**: ai_tech_visual_design 相关知识沉淀与实战资产包
+> **定位阐述**: 45种工程图解设计规范与专业SVG渲染
 
 ---
 ## 🌟 核心技术与工程特性对比矩阵 (Structured Knowledge Matrix)

@@ -1,6 +1,6 @@
 id: architecture_parametric_cad
-name: architecture_parametric_cad
-description: architecture_parametric_cad 相关知识沉淀与实战资产包
+name: 自然语言参数化工业CAD (Text-to-CAD)
+description: 一句话生成工业级可加工3D实体与尺寸工程图
 domain: architecture
 domain_name: 建筑设计与空间计算
 domain_icon: 🏛️

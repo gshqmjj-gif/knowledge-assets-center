@@ -1,7 +1,7 @@
-# 知识资产包：productivity_workflow_plugins
+# 知识资产包：专业岗位业务自动化插件 (Work Plugins)
 > **资产包标识**: `productivity_workflow_plugins` | **一级领域**: 📑 知识生产力与办公自动化
 > **收录资源数**: 1 篇/条 | **沉淀知识实体**: 1 个 | **更新时间**: 2026-10-27 05:28:02
-> **定位阐述**: productivity_workflow_plugins 相关知识沉淀与实战资产包
+> **定位阐述**: Anthropic 官方开源11大岗位标准化工作流
 
 ---
 ## 🌟 核心技术与工程特性对比矩阵 (Structured Knowledge Matrix)

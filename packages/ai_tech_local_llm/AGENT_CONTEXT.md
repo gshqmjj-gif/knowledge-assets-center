@@ -1,7 +1,7 @@
-# AGENT CONTEXT: ai_tech_local_llm
+# AGENT CONTEXT: 端侧推理与极限显存优化 (AirLLM & FreeLLM)
 <!-- This file is auto-generated for Cursor, Codex and Hermes Agent Reference -->
 **Domain**: ai_tech | **Tags**: 洛克AI, 开源项目, AI科技与大模型, 本地大模型与端侧推理优化, ai_tech, free-claude-code, B站精选, AirLLM, 知识资产, local_llm
-**Description**: ai_tech_local_llm 相关知识沉淀与实战资产包
+**Description**: 4G显存跑大模型与本地免费编程代理网关
 
 ## Structured Project Constraints & Technical Capabilities:
 ### Target Entity: AirLLM：4GB 显卡跑 70B 大
@@ -21,7 +21,7 @@
 - **Strict Pitfalls & Gotchas**: 【非 Anthropic 官方出品】该项目为社区逆向协议桥接器，代码理解上限取决于后端选定的模型质量。
 
 ## Project Constraints & Directives for Agent:
-1. You are operating as an expert specialist in ai_tech_local_llm.
+1. You are operating as an expert specialist in 端侧推理与极限显存优化 (AirLLM & FreeLLM).
 2. When generating code, strictly follow the hardware constraints and environment dependencies cataloged above.
 3. Do not re-download raw videos or save binary bloat; strictly use keyframes, transcripts, and atomic snippets.
 4. Respect the pitfalls and limitations outlined above to prevent dead ends.
