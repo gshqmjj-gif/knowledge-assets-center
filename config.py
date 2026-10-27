@@ -1,9 +1,10 @@
 """
-Hermes Knowledge Base Configuration (配置中心)
+知识资产中心 Configuration (配置中心)
 多级知识层级体系 (一级领域 > 二级子方向/专题 > 三级资产包)
 """
 import os
 import shutil
+import yaml
 from pathlib import Path
 
 # 根目录配置
@@ -11,6 +12,7 @@ BASE_DIR = Path(__file__).resolve().parent
 PACKAGES_DIR = BASE_DIR / "packages"
 TEMPLATES_DIR = BASE_DIR / "templates"
 TEMP_DIR = BASE_DIR / "temp"
+CUSTOM_DOMAINS_FILE = BASE_DIR / "custom_domains.yaml"
 
 # 创建核心目录
 PACKAGES_DIR.mkdir(parents=True, exist_ok=True)
@@ -32,7 +34,7 @@ FFPROBE_BIN = find_binary("ffprobe", ["/opt/homebrew/bin/ffprobe", "/usr/local/b
 
 # Git 配置
 GIT_AUTO_COMMIT = True
-GIT_DEFAULT_AUTHOR = "HermesKB Agent <hermes@local>"
+GIT_DEFAULT_AUTHOR = "知识资产中心 Agent <kb@local>"
 
 # 多级领域知识分类体系 (一级领域 > 二级子方向/专题)
 PRIMARY_DOMAINS = {
@@ -64,7 +66,7 @@ PRIMARY_DOMAINS = {
             "visual_design": {
                 "name": "架构可视化与技术图解",
                 "icon": "📊",
-                "keywords": ["图解", "架构图", "diagram", "时序图", "流程图", "excalidraw", "mermaid", "svg", "图解规矩", "视觉呈现"]
+                "keywords": ["架构图", "技术图解", "diagram", "时序图", "流程图", "excalidraw", "mermaid", "svg", "图解规矩", "视觉呈现"]
             }
         }
     },
@@ -232,3 +234,49 @@ VIDEO_SETTINGS = {
 }
 
 DEFAULT_USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
+
+def load_custom_domains():
+    """从本地 custom_domains.yaml 加载用户已授权创建的自定义领域与子方向"""
+    if CUSTOM_DOMAINS_FILE.exists():
+        try:
+            with open(CUSTOM_DOMAINS_FILE, "r", encoding="utf-8") as f:
+                data = yaml.safe_load(f) or {}
+                for d_key, d_val in data.items():
+                    if d_key in PRIMARY_DOMAINS:
+                        PRIMARY_DOMAINS[d_key]["sub_categories"].update(d_val.get("sub_categories", {}))
+                    else:
+                        PRIMARY_DOMAINS[d_key] = d_val
+        except Exception as e:
+            pass
+
+def save_custom_domain(domain_key: str, domain_name: str, domain_icon: str, sub_key: str, sub_name: str, sub_icon: str, keywords: list = None):
+    """持久化保存用户授权新创建的类别体系至 custom_domains.yaml"""
+    custom_data = {}
+    if CUSTOM_DOMAINS_FILE.exists():
+        try:
+            with open(CUSTOM_DOMAINS_FILE, "r", encoding="utf-8") as f:
+                custom_data = yaml.safe_load(f) or {}
+        except Exception:
+            pass
+
+    if domain_key not in custom_data:
+        custom_data[domain_key] = {
+            "name": domain_name,
+            "icon": domain_icon or "📁",
+            "aliases": [domain_name, domain_key],
+            "sub_categories": {}
+        }
+
+    custom_data[domain_key]["sub_categories"][sub_key] = {
+        "name": sub_name,
+        "icon": sub_icon or "📌",
+        "keywords": keywords or [sub_name.lower(), domain_name.lower(), sub_key.lower()]
+    }
+
+    with open(CUSTOM_DOMAINS_FILE, "w", encoding="utf-8") as f:
+        yaml.safe_dump(custom_data, f, allow_unicode=True, sort_keys=False)
+
+    load_custom_domains()
+
+# 初始化时加载已有自定义领域
+load_custom_domains()

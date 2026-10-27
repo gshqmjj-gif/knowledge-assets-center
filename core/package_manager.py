@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import yaml
 
-from config import PRIMARY_DOMAINS, PACKAGES_DIR, resolve_domain, resolve_sub_category
+from config import PRIMARY_DOMAINS, PACKAGES_DIR, resolve_domain, resolve_sub_category, save_custom_domain
 from core.knowledge_distiller import KnowledgeDistiller
 from core.knowledge_merger import KnowledgeMerger
 from crawlers.base import IngestedItem
@@ -241,19 +241,22 @@ class KnowledgePackageManager:
                 continue
             for sub_key, sub_data in dom_data.get("sub_categories", {}).items():
                 score = 0
+                matched_kws = []
                 for kw in sub_data.get("keywords", []):
                     kw_lower = kw.lower()
                     if kw_lower in search_blob:
+                        matched_kws.append(kw_lower)
                         # 核心关键词在标题或标签中权重翻倍
                         weight = 3 if (kw_lower in item.title.lower() or any(kw_lower in t.lower() for t in item.tags)) else 1
                         score += weight
-                if score > highest_score:
+                # 需命中至少2个不同关键词或单一高密度核心词(score >= 4)才建立强关联
+                if (len(matched_kws) >= 2 or score >= 4) and score > highest_score:
                     highest_score = score
                     best_domain_key = dom_key
                     best_sub_id = sub_key
 
-        # 若命中特定子方向 (得分 >= 2)
-        if best_domain_key and best_sub_id and highest_score >= 2:
+        # 若命中特定子方向 (得分 >= 3)
+        if best_domain_key and best_sub_id and highest_score >= 3:
             # 优先寻找该子方向已有资产包
             for pkg in self.list_packages():
                 if pkg.get("domain") == best_domain_key and pkg.get("sub_category") == best_sub_id:
@@ -286,6 +289,150 @@ class KnowledgePackageManager:
                 tags=["临时收藏", "待归档"]
             )
         return fallback_id
+
+    def classify_content(self, item: IngestedItem) -> Dict[str, Any]:
+        """
+        智能分类置信度判定：评估内容是否能被现有分类表结构化。
+        若置信度不足 (无法精准结构化归类)，提炼智能推荐新分类，供弹窗交互决策。
+        """
+        meta_dict = getattr(item, "metadata", {}) or {}
+        target_pkg = meta_dict.get("preferred_package")
+        target_domain = meta_dict.get("domain")
+        target_sub = meta_dict.get("sub_category")
+
+        # 若内容已显式指定了资产包或领域
+        if target_pkg or target_domain:
+            d_key = target_domain or "inbox"
+            s_key = target_sub or "general"
+            return {
+                "is_matched": True,
+                "matched_domain": d_key,
+                "matched_sub_category": s_key,
+                "score": 10,
+                "suggested": None
+            }
+
+        search_blob = f"{item.title} {item.summary} {' '.join(item.tags)} {item.content_markdown[:1000]}".lower()
+
+        best_domain_key = None
+        best_sub_id = None
+        highest_score = 0
+
+        for dom_key, dom_data in PRIMARY_DOMAINS.items():
+            if dom_key == "inbox":
+                continue
+            for sub_key, sub_data in dom_data.get("sub_categories", {}).items():
+                score = 0
+                matched_kws = []
+                for kw in sub_data.get("keywords", []):
+                    kw_lower = kw.lower()
+                    if kw_lower in search_blob:
+                        matched_kws.append(kw_lower)
+                        weight = 3 if (kw_lower in item.title.lower() or any(kw_lower in t.lower() for t in item.tags)) else 1
+                        score += weight
+                if (len(matched_kws) >= 2 or score >= 4) and score > highest_score:
+                    highest_score = score
+                    best_domain_key = dom_key
+                    best_sub_id = sub_key
+
+        # 强匹配判定 (至少命中2个不同关键词或得分 >= 3)
+        if best_domain_key and best_sub_id and highest_score >= 3:
+            return {
+                "is_matched": True,
+                "matched_domain": best_domain_key,
+                "matched_sub_category": best_sub_id,
+                "score": highest_score,
+                "suggested": None
+            }
+
+        # 无法按照目前分类表结构化：生成智能推荐新类别
+        title_lower = (item.title + " " + item.summary).lower()
+        if any(k in title_lower for k in ["医", "药", "健康", "针灸", "穴位", "临床", "病", "养生"]):
+            sug_domain_name = "生命健康与医药前沿"
+            sug_domain_key = "health_medicine"
+            sug_domain_icon = "🧬"
+            sug_sub_name = "临床诊疗与健康科普"
+            sug_sub_key = "clinical_health"
+            sug_sub_icon = "💊"
+        elif any(k in title_lower for k in ["游戏", "game", "玩法", "虚幻", "unity", "打击感", "关卡", "boss"]):
+            sug_domain_name = "游戏研发与互动叙事"
+            sug_domain_key = "game_dev"
+            sug_domain_icon = "🎮"
+            sug_sub_name = "游戏引擎与关卡机制"
+            sug_sub_key = "mechanics"
+            sug_sub_icon = "🕹️"
+        elif any(k in title_lower for k in ["法", "合规", "合同", "诉讼", "律师", "知识产权", "版权"]):
+            sug_domain_name = "法律合规与商业法务"
+            sug_domain_key = "law_compliance"
+            sug_domain_icon = "⚖️"
+            sug_sub_name = "企业法务与合同审查"
+            sug_sub_key = "compliance_review"
+            sug_sub_icon = "📜"
+        elif any(k in title_lower for k in ["财", "投资", "股票", "量化", "估值", "宏观", "基金", "理财"]):
+            sug_domain_name = "金融投资与量化经济"
+            sug_domain_key = "finance_investing"
+            sug_domain_icon = "📈"
+            sug_sub_name = "宏观研报与投资逻辑"
+            sug_sub_key = "macro_investment"
+            sug_sub_icon = "💹"
+        elif any(k in title_lower for k in ["美食", "料理", "烹饪", "咖啡", "烘焙", "拉花", "餐厅"]):
+            sug_domain_name = "生活方式与美食技艺"
+            sug_domain_key = "lifestyle_culinary"
+            sug_domain_icon = "☕"
+            sug_sub_name = "餐饮工艺与精品咖啡"
+            sug_sub_key = "craft_coffee"
+            sug_sub_icon = "🥐"
+        else:
+            clean_tag = item.tags[0] if (item.tags and len(item.tags[0]) <= 8) else item.title[:8]
+            clean_tag = re.sub(r'[^\u4e00-\u9fa5a-zA-Z0-9]', '', clean_tag) or "新兴专题"
+            sug_domain_name = f"{clean_tag}研究与探索"
+            sug_domain_key = re.sub(r'[^a-zA-Z0-9_]', '_', clean_tag).lower().strip('_') or "new_topic"
+            sug_domain_icon = "💡"
+            sug_sub_name = f"{clean_tag}实战方法论"
+            sug_sub_key = f"{sug_domain_key}_practices"
+            sug_sub_icon = "📌"
+
+        return {
+            "is_matched": False,
+            "matched_domain": None,
+            "matched_sub_category": None,
+            "score": highest_score,
+            "suggested": {
+                "domain_key": sug_domain_key,
+                "domain_name": sug_domain_name,
+                "domain_icon": sug_domain_icon,
+                "sub_key": sug_sub_key,
+                "sub_name": sug_sub_name,
+                "sub_icon": sug_sub_icon
+            }
+        }
+
+    def create_custom_domain_and_package(
+        self,
+        domain_key: str,
+        domain_name: str,
+        domain_icon: str,
+        sub_key: str,
+        sub_name: str,
+        sub_icon: str
+    ) -> str:
+        """用户确认允许创建新类别后，持久化注册领域与子方向并创建资产包"""
+        clean_dom = re.sub(r'[^a-zA-Z0-9_\-]', '_', domain_key).lower().strip('_')
+        clean_sub = re.sub(r'[^a-zA-Z0-9_\-]', '_', sub_key).lower().strip('_')
+        save_custom_domain(clean_dom, domain_name, domain_icon, clean_sub, sub_name, sub_icon)
+
+        pkg_id = f"{clean_dom}_{clean_sub}"
+        pkg_name = f"{sub_name}知识资产包"
+        if not (self.packages_dir / pkg_id).exists():
+            self.create_package(
+                package_id=pkg_id,
+                name=pkg_name,
+                description=f"{domain_name} > {sub_name} 知识资产沉淀",
+                domain=clean_dom,
+                sub_category=clean_sub,
+                tags=[domain_name, sub_name, "自定义新类别"]
+            )
+        return pkg_id
 
     def ingest_item(
         self,

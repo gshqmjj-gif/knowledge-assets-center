@@ -1,5 +1,5 @@
 """
-Hermes Knowledge Base Command Line Interface (CLI)
+知识资产中心 Command Line Interface (CLI)
 命令行交互终端：知识极速采集、资产包检索、一键向 Cursor / Codex / Hermes 派发
 """
 import sys
@@ -23,8 +23,8 @@ from core.package_manager import KnowledgePackageManager
 from crawlers.dispatcher import CrawlerDispatcher
 
 app = typer.Typer(
-    name="hermes-kb",
-    help="⚡ Hermes 知识库创建助手：多模态采集（微信/视频号/B站/网页/图片），结构化资产包拆分与多 Agent 参考派发",
+    name="kb",
+    help="📦 知识资产中心 (K-Assets)：多模态采集（微信/视频号/B站/网页/图片），结构化资产包拆分与多 Agent 参考派发",
     add_completion=False
 )
 console = Console()
@@ -39,7 +39,8 @@ def ingest_cmd(
     target: str = typer.Argument(..., help="待采集目标：微信公众号URL、视频号分享文本/链接、B站视频URL、通用网页URL或本地图片路径"),
     package: Optional[str] = typer.Option(None, "--package", "-p", help="指定归属的知识资产包ID (如未指定将自动智能聚类)"),
     domain: Optional[str] = typer.Option(None, "--domain", "-d", help="指定一级领域分类 (如: 商业, AI科技, 建筑, 3D视觉, 产品, 全栈工程)"),
-    sub: Optional[str] = typer.Option(None, "--sub", "-s", help="指定二级子方向 (如: ai_reverse, ai_video, saas_growth 等)")
+    sub: Optional[str] = typer.Option(None, "--sub", "-s", help="指定二级子方向 (如: ai_reverse, ai_video, saas_growth 等)"),
+    yes: bool = typer.Option(False, "--yes", "-y", help="非交互模式：自动采用推荐分类")
 ):
     """
     📥 极速采集并归档至知识资产包
@@ -50,13 +51,66 @@ def ingest_cmd(
     with console.status("[bold green]正在抓取数据、清洗正文并提取关键帧与代码片段...", spinner="dots"):
         try:
             item = dispatcher.dispatch(target)
+        except Exception as e:
+            console.print(f"[bold red]❌ 抓取失败:[/bold red] {e}")
+            raise typer.Exit(code=1)
+
+    # 检查是否能够被现有分类表结构化
+    has_sub_items = getattr(item, "sub_items", None) and len(item.sub_items) >= 2
+    if not has_sub_items and not package and not domain and not yes:
+        clf = pm.classify_content(item)
+        if not clf["is_matched"]:
+            console.print("\n[bold yellow]⚠️ 该内容未能精准匹配现有知识分类表！[/bold yellow]")
+            sug = clf["suggested"]
+            console.print(f"📄 [bold white]资料标题:[/bold white] 《{item.title}》")
+            console.print(f"💡 [bold green]智能推荐新类别:[/bold green] {sug['domain_icon']} {sug['domain_name']} > {sug['sub_icon']} {sug['sub_name']}")
+            console.print("\n[bold cyan]请决策知识分类归属方式:[/bold cyan]")
+            console.print("  [1] [bold green]允许创建新类别[/bold green] (以推荐名称扩展分类并入库)")
+            console.print("  [2] [bold blue]我不允许[/bold blue]，由我指定某一现有类别")
+            console.print("  [3] 放入待整理临时收件箱")
+            console.print("  [4] 取消本次操作")
+
+            choice = typer.prompt("请选择 (1/2/3/4)", default="1")
+            if choice == "1":
+                dom_name_input = typer.prompt("确认一级领域名称", default=sug["domain_name"])
+                sub_name_input = typer.prompt("确认二级子方向名称", default=sug["sub_name"])
+                new_pkg_id = pm.create_custom_domain_and_package(
+                    domain_key=sug["domain_key"],
+                    domain_name=dom_name_input,
+                    domain_icon=sug["domain_icon"],
+                    sub_key=sug["sub_key"],
+                    sub_name=sub_name_input,
+                    sub_icon=sug["sub_icon"]
+                )
+                package = new_pkg_id
+                domain = sug["domain_key"]
+                sub = sug["sub_key"]
+            elif choice == "2":
+                console.print("\n[bold white]可选的现有分类列表:[/bold white]")
+                idx_map = []
+                idx = 1
+                for dk, dv in PRIMARY_DOMAINS.items():
+                    for sk, sv in dv.get("sub_categories", {}).items():
+                        console.print(f"  [{idx}] {dv.get('icon', '📁')} {dv.get('name', dk)} > {sv.get('icon', '📌')} {sv.get('name', sk)}")
+                        idx_map.append((dk, sk))
+                        idx += 1
+                sel_idx = typer.prompt(f"请输入分类序号 (1-{len(idx_map)})", type=int, default=1)
+                if 1 <= sel_idx <= len(idx_map):
+                    domain, sub = idx_map[sel_idx - 1]
+            elif choice == "3":
+                domain = "inbox"
+                sub = "quick_capture"
+            else:
+                console.print("[dim]操作已取消。[/dim]")
+                return
+
+    with console.status("[bold green]正在入库、提炼知识矩阵并提交 Git...", spinner="dots"):
+        try:
             pkg_id, source_path = pm.ingest_item(item, preferred_package=package, preferred_domain=domain, preferred_sub_category=sub)
-            
-            # Git 自动跟踪与版本提交
             commit_msg = f"feat(kb): ingest [{item.source_type}] {item.title[:40]} into '{pkg_id}'"
             commit_hash = git_mgr.commit(commit_msg)
         except Exception as e:
-            console.print(f"[bold red]❌ 采集入库失败:[/bold red] {e}")
+            console.print(f"[bold red]❌ 归包入库失败:[/bold red] {e}")
             raise typer.Exit(code=1)
 
     # 获取该资产包元数据
@@ -125,7 +179,7 @@ def list_cmd(
         console.print("[yellow]当前资产库为空或无匹配项。使用 [bold cyan]hermes-kb ingest <url>[/bold cyan] 开始构建！[/yellow]")
         return
 
-    table = Table(title="🗂️ Hermes 多级知识资产库全景 (Knowledge Hierarchy)", box=box.ROUNDED)
+    table = Table(title="🗂️ 知识资产中心全景 (Knowledge Hierarchy)", box=box.ROUNDED)
     table.add_column("一级领域", style="magenta")
     table.add_column("二级子方向", style="blue")
     table.add_column("资产包 ID", style="cyan", no_wrap=True)
@@ -280,7 +334,7 @@ def serve_cmd(
     🌐 启动本地可视化操作台 (Web Dashboard)
     """
     import uvicorn
-    console.print(f"[bold green]🚀 正在启动 Hermes 知识资产中心可视化控制台...[/bold green]")
+    console.print(f"[bold green]🚀 正在启动 知识资产中心 可视化控制台...[/bold green]")
     console.print(f"👉 访问地址: [bold cyan]http://{host}:{port}[/bold cyan]")
     uvicorn.run("core.web_server:app", host=host, port=port, reload=False)
 

@@ -20,7 +20,7 @@ from crawlers.dispatcher import CrawlerDispatcher
 
 logger = logging.getLogger("hermes.web")
 
-app = FastAPI(title="Hermes Knowledge Base Assistant", version="1.0.0")
+app = FastAPI(title="知识资产中心 (Knowledge Assets Hub)", version="2.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -43,6 +43,14 @@ class IngestRequest(BaseModel):
     package: Optional[str] = None
     domain: Optional[str] = None
     sub_category: Optional[str] = None
+    allow_create_new: Optional[bool] = False
+    new_domain_key: Optional[str] = None
+    new_domain_name: Optional[str] = None
+    new_domain_icon: Optional[str] = None
+    new_sub_key: Optional[str] = None
+    new_sub_name: Optional[str] = None
+    new_sub_icon: Optional[str] = None
+    force_confirm: Optional[bool] = False
 
 class CopyRequest(BaseModel):
     text: str
@@ -128,13 +136,74 @@ def get_package(package_id: str):
 @app.post("/api/ingest")
 def ingest_api(req: IngestRequest):
     try:
+        import re
         item = dispatcher.dispatch(req.url)
-        pkg_id, source_path = pm.ingest_item(
-            item,
-            preferred_package=req.package,
-            preferred_domain=req.domain,
-            preferred_sub_category=req.sub_category
-        )
+
+        # 1. 用户允许创建新类别
+        if req.allow_create_new and req.new_domain_name and req.new_sub_name:
+            dom_key = req.new_domain_key or re.sub(r'[^a-zA-Z0-9_]', '_', req.new_domain_name).lower().strip('_')
+            sub_key = req.new_sub_key or re.sub(r'[^a-zA-Z0-9_]', '_', req.new_sub_name).lower().strip('_')
+            new_pkg_id = pm.create_custom_domain_and_package(
+                domain_key=dom_key,
+                domain_name=req.new_domain_name,
+                domain_icon=req.new_domain_icon or "📁",
+                sub_key=sub_key,
+                sub_name=req.new_sub_name,
+                sub_icon=req.new_sub_icon or "📌"
+            )
+            pkg_id, source_path = pm.ingest_item(
+                item,
+                preferred_package=new_pkg_id,
+                preferred_domain=dom_key,
+                preferred_sub_category=sub_key
+            )
+
+        # 2. 用户显式指定了现有领域/子方向或已有资产包
+        elif req.package or req.domain or req.sub_category:
+            pkg_id, source_path = pm.ingest_item(
+                item,
+                preferred_package=req.package,
+                preferred_domain=req.domain,
+                preferred_sub_category=req.sub_category
+            )
+
+        # 3. 自动识别：若无法按照现有分类表结构化，弹出确认对话框
+        else:
+            has_sub_items = getattr(item, "sub_items", None) and len(item.sub_items) >= 2
+            if not has_sub_items:
+                clf_result = pm.classify_content(item)
+                if not clf_result["is_matched"] and not req.force_confirm:
+                    # 构建完整分类树供用户选择现有类别
+                    taxonomy_list = []
+                    for dk, dv in PRIMARY_DOMAINS.items():
+                        subs = [
+                            {"id": sk, "name": sv.get("name", sk), "icon": sv.get("icon", "📌")}
+                            for sk, sv in dv.get("sub_categories", {}).items()
+                        ]
+                        taxonomy_list.append({
+                            "domain_key": dk,
+                            "domain_name": dv.get("name", dk),
+                            "domain_icon": dv.get("icon", "📁"),
+                            "sub_categories": subs
+                        })
+
+                    return {
+                        "success": False,
+                        "needs_confirmation": True,
+                        "message": "未能精准匹配现有分类体系，请确认是否允许创建新类别或指定某一现有类别。",
+                        "item_preview": {
+                            "title": item.title,
+                            "source_type": item.source_type,
+                            "author": item.author,
+                            "summary": item.summary,
+                            "tags": item.tags,
+                            "url": req.url
+                        },
+                        "suggested_category": clf_result["suggested"],
+                        "existing_taxonomy": taxonomy_list
+                    }
+
+            pkg_id, source_path = pm.ingest_item(item)
         
         # Git 自动提交
         commit_hash = git_mgr.commit(f"feat(kb): ingest [{item.source_type}] {item.title[:40]} into package '{pkg_id}'")
@@ -153,7 +222,7 @@ def ingest_api(req: IngestRequest):
             "domain_icon": pkg_meta.get("domain_icon"),
             "sub_category_name": pkg_meta.get("sub_category_name"),
             "sub_category_icon": pkg_meta.get("sub_category_icon"),
-            "source_file": source_path.name,
+            "source_file": source_path.name if source_path else "",
             "keyframes_count": len(item.keyframes),
             "snippets_count": len(item.code_snippets),
             "decomposed": sub_items_count >= 2,
@@ -226,7 +295,7 @@ HTML_DASHBOARD = r"""
   <meta charset="UTF-8">
   <meta name="referrer" content="no-referrer">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Hermes 知识资产中心</title>
+  <title>知识资产中心</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -270,12 +339,12 @@ HTML_DASHBOARD = r"""
     <div class="max-w-[1720px] mx-auto flex items-center justify-between gap-4">
       <!-- Logo & Title -->
       <div class="flex items-center space-x-3 shrink-0">
-        <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center text-white font-extrabold text-lg shadow-md shadow-indigo-500/20">
-          H
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center text-white font-black text-xl shadow-md shadow-indigo-500/30 tracking-tight">
+          K
         </div>
         <div>
           <div class="flex items-center gap-2">
-            <h1 class="text-base font-bold text-white tracking-tight">Hermes 知识资产中心</h1>
+            <h1 class="text-base font-bold text-white tracking-tight">知识资产中心</h1>
             <span class="text-[10px] bg-indigo-950/80 text-indigo-300 border border-indigo-800/60 px-1.5 py-0.2 rounded font-mono">v2.0</span>
           </div>
           <p class="text-[11px] text-gray-400">微信/视频号/B站/网页/图片多模态沉淀 · 纯本地 Git 离线脱机存储</p>
@@ -470,6 +539,91 @@ HTML_DASHBOARD = r"""
       </button>
       <img id="lightboxImg" src="" class="max-w-full max-h-[85vh] rounded-xl border border-gray-800 shadow-2xl object-contain">
       <div id="lightboxCaption" class="mt-2 text-xs font-mono text-gray-400 text-center"></div>
+    </div>
+  </div>
+
+  <!-- Interactive Classification Decision Modal (分类未命中交互决策弹窗) -->
+  <div id="classificationModal" class="fixed inset-0 bg-black/90 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-gray-900 border border-yellow-500/40 w-full max-w-2xl max-h-[92vh] rounded-2xl flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+      <div class="flex justify-between items-center px-6 py-4 border-b border-gray-800 bg-gray-950/90">
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 rounded-lg bg-yellow-500/20 text-yellow-400 flex items-center justify-center text-sm font-bold border border-yellow-500/30">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-white">未能精准匹配现有知识分类表</h3>
+            <p class="text-[11px] text-gray-400">系统对该内容的分析未命中现有领域，请决策分类归属：</p>
+          </div>
+        </div>
+        <button onclick="closeClassificationModal()" class="text-gray-400 hover:text-white p-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 transition">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="p-6 overflow-y-auto flex-1 space-y-5 text-xs text-gray-200">
+        <!-- Ingested Content Preview Card -->
+        <div class="bg-gray-950/80 border border-gray-800 rounded-xl p-3.5 space-y-2">
+          <div class="flex items-center justify-between text-[11px] text-gray-400">
+            <span class="flex items-center gap-1.5 text-indigo-400 font-medium">
+              <i class="fa-solid fa-file-lines"></i> 待入库实体
+            </span>
+            <span id="clfSourceType" class="font-mono bg-gray-900 px-2 py-0.5 rounded border border-gray-800"></span>
+          </div>
+          <h4 id="clfTitle" class="text-sm font-bold text-white leading-snug"></h4>
+          <p id="clfSummary" class="text-xs text-gray-400 line-clamp-2"></p>
+        </div>
+
+        <!-- Choice 1: Allow Creating New Category -->
+        <div class="border border-emerald-500/40 bg-emerald-950/10 rounded-xl p-4 space-y-3">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+              <span class="text-xs font-bold text-white">选项一：我允许创建新的分类类别 (推荐)</span>
+            </div>
+            <span class="text-[10px] bg-emerald-950 text-emerald-400 border border-emerald-800 px-2 py-0.5 rounded font-mono">智能推荐</span>
+          </div>
+          <p class="text-[11px] text-gray-400">系统将根据您确认的名称，永久扩展分类体系并自动生成专属资产包：</p>
+          
+          <div class="grid grid-cols-2 gap-3 pt-1">
+            <div>
+              <label class="block text-[11px] text-gray-400 mb-1">一级所属领域名称</label>
+              <input id="clfNewDomainName" type="text" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500">
+            </div>
+            <div>
+              <label class="block text-[11px] text-gray-400 mb-1">二级子方向专题名称</label>
+              <input id="clfNewSubName" type="text" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500">
+            </div>
+          </div>
+
+          <button id="btnAllowCreateNew" onclick="confirmCreateNewCategory()" class="w-full mt-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-medium py-2 rounded-lg text-xs shadow-md shadow-emerald-900/30 flex items-center justify-center gap-2 transition">
+            <i class="fa-solid fa-folder-plus"></i> 允许并以新类别创建资产包入库
+          </button>
+        </div>
+
+        <!-- Choice 2: Disallow, Let User Select Existing Category -->
+        <div class="border border-indigo-500/30 bg-indigo-950/10 rounded-xl p-4 space-y-3">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-indigo-400"></span>
+            <span class="text-xs font-bold text-white">选项二：我不允许，由我指定归入某一现有类别</span>
+          </div>
+          <p class="text-[11px] text-gray-400">从当前的知识库领域分类表中选择最符合的分类：</p>
+
+          <div class="pt-1">
+            <select id="clfSelectExisting" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500">
+            </select>
+          </div>
+
+          <button id="btnSelectExisting" onclick="confirmSelectExistingCategory()" class="w-full mt-2 bg-gray-800 hover:bg-gray-700 text-white font-medium py-2 rounded-lg text-xs border border-gray-700 flex items-center justify-center gap-2 transition">
+            <i class="fa-solid fa-check"></i> 归入所选现有类别
+          </button>
+        </div>
+      </div>
+
+      <div class="px-6 py-3 border-t border-gray-800 bg-gray-950/90 flex justify-end">
+        <button onclick="closeClassificationModal()" class="text-xs text-gray-400 hover:text-white px-3 py-1.5 rounded-lg hover:bg-gray-800 transition">
+          放弃本次录入
+        </button>
+      </div>
     </div>
   </div>
 
@@ -965,7 +1119,141 @@ HTML_DASHBOARD = r"""
       selectPackage(pkgId);
     }
 
-    // 5. 极速采集
+    // 5. 极速采集与智能分类交互
+    let pendingClfData = null;
+
+    function openClassificationModal(data) {
+      pendingClfData = data;
+      document.getElementById('clfTitle').innerText = data.item_preview.title;
+      document.getElementById('clfSourceType').innerText = data.item_preview.source_type || 'web_page';
+      document.getElementById('clfSummary').innerText = data.item_preview.summary || '(暂无内容摘要)';
+
+      if (data.suggested_category) {
+        document.getElementById('clfNewDomainName').value = data.suggested_category.domain_name || '综合研究领域';
+        document.getElementById('clfNewSubName').value = data.suggested_category.sub_name || '实战方法专题';
+      } else {
+        document.getElementById('clfNewDomainName').value = '新兴前沿专题';
+        document.getElementById('clfNewSubName').value = '核心实践';
+      }
+
+      // 渲染现有分类下拉选单
+      const selectElem = document.getElementById('clfSelectExisting');
+      selectElem.innerHTML = '';
+      if (data.existing_taxonomy && data.existing_taxonomy.length > 0) {
+        data.existing_taxonomy.forEach(d => {
+          const optGroup = document.createElement('optgroup');
+          optGroup.label = `${d.domain_icon} ${d.domain_name}`;
+          (d.sub_categories || []).forEach(s => {
+            const opt = document.createElement('option');
+            opt.value = `${d.domain_key}::${s.id}`;
+            opt.innerText = `${s.icon || '📌'} ${s.name}`;
+            optGroup.appendChild(opt);
+          });
+          selectElem.appendChild(optGroup);
+        });
+      }
+
+      document.getElementById('classificationModal').classList.remove('hidden');
+    }
+
+    function closeClassificationModal() {
+      document.getElementById('classificationModal').classList.add('hidden');
+      pendingClfData = null;
+    }
+
+    async function confirmCreateNewCategory() {
+      if (!pendingClfData) return;
+      const newDomainName = document.getElementById('clfNewDomainName').value.trim();
+      const newSubName = document.getElementById('clfNewSubName').value.trim();
+      if (!newDomainName || !newSubName) {
+        showToast('请输入完整的一级领域与二级子方向名称', false);
+        return;
+      }
+
+      const btn = document.getElementById('btnAllowCreateNew');
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner animate-spin"></i> 创建新类别并沉淀中...';
+
+      try {
+        const res = await fetch('/api/ingest', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            url: pendingClfData.item_preview.url,
+            allow_create_new: true,
+            new_domain_name: newDomainName,
+            new_sub_name: newSubName,
+            force_confirm: true
+          })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast(`成功创建新分类「${newDomainName} > ${newSubName}」并完成归包！`);
+          closeClassificationModal();
+          document.getElementById('inputUrl').value = '';
+          const statusDiv = document.getElementById('ingestStatus');
+          statusDiv.className = 'mt-2 text-xs text-emerald-400 block';
+          statusDiv.innerText = `成功以新类别入库《${data.title}》！归属 [📁 ${data.domain_name} > 📌 ${data.sub_category_name}]`;
+          await loadTaxonomy();
+          await loadPackages();
+          selectPackage(data.package_id);
+        } else {
+          throw new Error(data.detail || '创建新类别录入失败');
+        }
+      } catch (e) {
+        showToast('录入异常: ' + e.message, false);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-folder-plus"></i> 允许并以新类别创建资产包入库';
+      }
+    }
+
+    async function confirmSelectExistingCategory() {
+      if (!pendingClfData) return;
+      const selectVal = document.getElementById('clfSelectExisting').value;
+      if (!selectVal) {
+        showToast('请选择一个现有类别', false);
+        return;
+      }
+      const [domKey, subKey] = selectVal.split('::');
+
+      const btn = document.getElementById('btnSelectExisting');
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner animate-spin"></i> 归入现有分类中...';
+
+      try {
+        const res = await fetch('/api/ingest', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            url: pendingClfData.item_preview.url,
+            domain: domKey,
+            sub_category: subKey,
+            force_confirm: true
+          })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast(`成功归入现有类别 [${data.domain_name} > ${data.sub_category_name}]！`);
+          closeClassificationModal();
+          document.getElementById('inputUrl').value = '';
+          const statusDiv = document.getElementById('ingestStatus');
+          statusDiv.className = 'mt-2 text-xs text-emerald-400 block';
+          statusDiv.innerText = `成功录入《${data.title}》！归属 [${data.domain_icon || '📁'} ${data.domain_name} > ${data.sub_category_name}]`;
+          await loadTaxonomy();
+          await loadPackages();
+          selectPackage(data.package_id);
+        } else {
+          throw new Error(data.detail || '归入现有类别失败');
+        }
+      } catch (e) {
+        showToast('归入异常: ' + e.message, false);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-check"></i> 归入所选现有类别';
+      }
+    }
+
     async function handleIngest() {
       const urlInput = document.getElementById('inputUrl');
       const statusDiv = document.getElementById('ingestStatus');
@@ -995,6 +1283,15 @@ HTML_DASHBOARD = r"""
           })
         });
         const data = await res.json();
+
+        // 若无法精准匹配现有分类表，触发用户交互决策弹窗
+        if (data.needs_confirmation) {
+          statusDiv.className = 'mt-2 text-xs text-yellow-400 block';
+          statusDiv.innerText = '⚠️ 该内容未匹配现有分类表，请在弹窗中确认是否创建新类别或指定现有类别...';
+          openClassificationModal(data);
+          return;
+        }
+
         if (data.success) {
           statusDiv.className = 'mt-2 text-xs text-emerald-400 block';
           if (data.decomposed) {
