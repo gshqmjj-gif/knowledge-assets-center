@@ -1025,7 +1025,7 @@ HTML_DASHBOARD = r"""
               <i class="fa-solid fa-file-waveform text-purple-400"></i> 资产包聚合体系大纲 (SUMMARY.md 渲染预览)
             </h4>
             <div class="bg-gray-900/90 border border-gray-800 p-4 rounded-xl text-xs text-gray-300 max-h-80 overflow-y-auto leading-relaxed prose-clean">
-              ${marked.parse((data.summary || '').replace(/\(keyframes\//g, `(/packages/${data.id}/keyframes/`).replace(/\(assets\//g, `(/packages/${data.id}/assets/`))}
+              ${marked.parse((data.summary || '').replace(/\(keyframes\//g, `(/packages/${pkgId}/keyframes/`).replace(/\(assets\//g, `(/packages/${pkgId}/assets/`))}
             </div>
           </div>
         `;
