@@ -72,6 +72,28 @@ class IngestRequest(BaseModel):
 class CopyRequest(BaseModel):
     text: str
 
+class MovePackageRequest(BaseModel):
+    domain: str
+    sub_category: Optional[str] = None
+
+class RenamePackageRequest(BaseModel):
+    name: str
+    description: Optional[str] = None
+
+class RenameSourceRequest(BaseModel):
+    file: str
+    new_title: str
+
+class MoveSourceRequest(BaseModel):
+    file: str
+    target_package_id: str
+
+class RenameCategoryRequest(BaseModel):
+    domain_key: str
+    sub_key: Optional[str] = None
+    new_name: str
+    new_icon: Optional[str] = None
+
 @app.get("/api/taxonomy")
 def get_taxonomy():
     pkgs = pm.list_packages()
@@ -117,6 +139,70 @@ def delete_source_api(package_id: str, file: str):
         raise HTTPException(status_code=404, detail="Source not found")
     git_mgr.commit(f"feat(kb): delete source '{file}' from '{package_id}'")
     return {"success": True, "message": f"Source {file} deleted."}
+
+@app.post("/api/packages/{package_id}/move")
+def move_package_api(package_id: str, req: MovePackageRequest):
+    ok = pm.move_package(package_id, req.domain, req.sub_category)
+    if not ok:
+        raise HTTPException(status_code=400, detail="Failed to move package")
+    git_mgr.commit(f"feat(kb): move package '{package_id}' to [{req.domain} > {req.sub_category}]")
+    return {"success": True, "message": f"资产包归属已成功调整"}
+
+@app.post("/api/packages/{package_id}/rename")
+def rename_package_api(package_id: str, req: RenamePackageRequest):
+    ok = pm.rename_package(package_id, req.name, req.description)
+    if not ok:
+        raise HTTPException(status_code=400, detail="Failed to rename package")
+    git_mgr.commit(f"feat(kb): rename package '{package_id}' to '{req.name}'")
+    return {"success": True, "message": f"资产包已重命名为 {req.name}"}
+
+@app.post("/api/packages/{package_id}/sources/rename")
+def rename_source_api(package_id: str, req: RenameSourceRequest):
+    ok = pm.rename_source(package_id, req.file, req.new_title)
+    if not ok:
+        raise HTTPException(status_code=400, detail="Failed to rename source")
+    git_mgr.commit(f"feat(kb): rename source '{req.file}' in '{package_id}' to '{req.new_title}'")
+    return {"success": True, "message": f"文献资料已重命名为 {req.new_title}"}
+
+@app.post("/api/packages/{package_id}/sources/move")
+def move_source_api(package_id: str, req: MoveSourceRequest):
+    ok = pm.move_source(package_id, req.target_package_id, req.file)
+    if not ok:
+        raise HTTPException(status_code=400, detail="Failed to move source")
+    git_mgr.commit(f"feat(kb): move source '{req.file}' from '{package_id}' to '{req.target_package_id}'")
+    return {"success": True, "message": f"文献资料已迁移至资产包 {req.target_package_id}"}
+
+@app.post("/api/taxonomy/rename")
+def rename_category_api(req: RenameCategoryRequest):
+    from config import PRIMARY_DOMAINS, save_custom_domain
+    if req.domain_key not in PRIMARY_DOMAINS:
+        raise HTTPException(status_code=404, detail="Domain not found")
+
+    dom = PRIMARY_DOMAINS[req.domain_key]
+    if req.sub_key:
+        if req.sub_key not in dom.get("sub_categories", {}):
+            raise HTTPException(status_code=404, detail="Sub-category not found")
+        dom["sub_categories"][req.sub_key]["name"] = req.new_name
+        if req.new_icon:
+            dom["sub_categories"][req.sub_key]["icon"] = req.new_icon
+        save_custom_domain(
+            req.domain_key, dom["name"], dom.get("icon", "📁"),
+            req.sub_key, req.new_name, req.new_icon or dom["sub_categories"][req.sub_key].get("icon", "📌")
+        )
+    else:
+        dom["name"] = req.new_name
+        if req.new_icon:
+            dom["icon"] = req.new_icon
+        first_sub = list(dom.get("sub_categories", {}).keys())[0] if dom.get("sub_categories") else "general"
+        first_sub_name = dom.get("sub_categories", {}).get(first_sub, {}).get("name", "通用")
+        first_sub_icon = dom.get("sub_categories", {}).get(first_sub, {}).get("icon", "📌")
+        save_custom_domain(
+            req.domain_key, req.new_name, req.new_icon or dom.get("icon", "📁"),
+            first_sub, first_sub_name, first_sub_icon
+        )
+
+    git_mgr.commit(f"feat(kb): rename category [{req.domain_key}/{req.sub_key or ''}] to '{req.new_name}'")
+    return {"success": True, "message": f"分类板块已重命名为 {req.new_name}"}
 
 @app.get("/api/search")
 def search_api(q: str):
@@ -649,6 +735,154 @@ HTML_DASHBOARD = r"""
     </div>
   </div>
 
+  <!-- Rename Package Modal (重命名知识资产包) -->
+  <div id="renamePackageModal" class="fixed inset-0 bg-black/85 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-gray-900 border border-gray-700 w-full max-w-md rounded-2xl flex flex-col shadow-2xl overflow-hidden">
+      <div class="flex justify-between items-center px-6 py-4 border-b border-gray-800 bg-gray-950/80">
+        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+          <i class="fa-solid fa-pen-to-square text-indigo-400"></i> 重命名知识资产包
+        </h3>
+        <button onclick="closeRenamePackageModal()" class="text-gray-400 hover:text-white p-1 rounded-lg">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div class="p-6 space-y-4">
+        <input type="hidden" id="renamePkgId" value="">
+        <div>
+          <label class="block text-xs font-semibold text-gray-300 mb-1.5">资产包名称:</label>
+          <input type="text" id="renamePkgNameInput" class="w-full bg-gray-950 border border-gray-700 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-indigo-500">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-gray-300 mb-1.5">定位阐述与简介:</label>
+          <textarea id="renamePkgDescInput" rows="3" class="w-full bg-gray-950 border border-gray-700 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 leading-relaxed"></textarea>
+        </div>
+      </div>
+      <div class="px-6 py-3 border-t border-gray-800 bg-gray-950/90 flex justify-end gap-2">
+        <button onclick="closeRenamePackageModal()" class="px-4 py-1.5 rounded-lg text-xs text-gray-400 hover:text-white hover:bg-gray-800 transition">取消</button>
+        <button id="btnSubmitRenamePkg" onclick="submitRenamePackage()" class="btn-gradient px-4 py-1.5 rounded-lg text-xs font-semibold text-white shadow transition">保存修改</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Move Package Modal (调整资产包从属板块) -->
+  <div id="movePackageModal" class="fixed inset-0 bg-black/85 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-gray-900 border border-gray-700 w-full max-w-md rounded-2xl flex flex-col shadow-2xl overflow-hidden">
+      <div class="flex justify-between items-center px-6 py-4 border-b border-gray-800 bg-gray-950/80">
+        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+          <i class="fa-solid fa-arrows-up-down-left-right text-indigo-400"></i> 调整资产包从属板块
+        </h3>
+        <button onclick="closeMovePackageModal()" class="text-gray-400 hover:text-white p-1 rounded-lg">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div class="p-6 space-y-4">
+        <input type="hidden" id="movePkgId" value="">
+        <div class="text-xs text-gray-400">
+          正在为资产包 <span id="movePkgNameLabel" class="text-white font-bold font-mono"></span> 变更所属领域与子方向：
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-gray-300 mb-1.5">目标一级领域:</label>
+          <select id="movePkgDomainSelect" onchange="handleMoveDomainChange()" class="w-full bg-gray-950 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"></select>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-gray-300 mb-1.5">目标二级子方向:</label>
+          <select id="movePkgSubSelect" class="w-full bg-gray-950 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"></select>
+        </div>
+      </div>
+      <div class="px-6 py-3 border-t border-gray-800 bg-gray-950/90 flex justify-end gap-2">
+        <button onclick="closeMovePackageModal()" class="px-4 py-1.5 rounded-lg text-xs text-gray-400 hover:text-white hover:bg-gray-800 transition">取消</button>
+        <button id="btnSubmitMovePkg" onclick="submitMovePackage()" class="btn-gradient px-4 py-1.5 rounded-lg text-xs font-semibold text-white shadow transition">确认迁移归属</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rename Source Modal (重命名单篇文献资料标题) -->
+  <div id="renameSourceModal" class="fixed inset-0 bg-black/85 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-gray-900 border border-gray-700 w-full max-w-md rounded-2xl flex flex-col shadow-2xl overflow-hidden">
+      <div class="flex justify-between items-center px-6 py-4 border-b border-gray-800 bg-gray-950/80">
+        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+          <i class="fa-solid fa-pen-to-square text-emerald-400"></i> 重命名文献资料标题
+        </h3>
+        <button onclick="closeRenameSourceModal()" class="text-gray-400 hover:text-white p-1 rounded-lg">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div class="p-6 space-y-4">
+        <input type="hidden" id="renameSourcePkgId" value="">
+        <input type="hidden" id="renameSourceFile" value="">
+        <div>
+          <label class="block text-xs font-semibold text-gray-300 mb-1.5">资料标题:</label>
+          <input type="text" id="renameSourceTitleInput" class="w-full bg-gray-950 border border-gray-700 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-indigo-500">
+        </div>
+      </div>
+      <div class="px-6 py-3 border-t border-gray-800 bg-gray-950/90 flex justify-end gap-2">
+        <button onclick="closeRenameSourceModal()" class="px-4 py-1.5 rounded-lg text-xs text-gray-400 hover:text-white hover:bg-gray-800 transition">取消</button>
+        <button onclick="submitRenameSource()" class="btn-gradient px-4 py-1.5 rounded-lg text-xs font-semibold text-white shadow transition">保存更改</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Move Source to Another Package Modal (迁移资料到其他资产包) -->
+  <div id="moveSourceModal" class="fixed inset-0 bg-black/85 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-gray-900 border border-gray-700 w-full max-w-md rounded-2xl flex flex-col shadow-2xl overflow-hidden">
+      <div class="flex justify-between items-center px-6 py-4 border-b border-gray-800 bg-gray-950/80">
+        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+          <i class="fa-solid fa-arrow-right-to-bracket text-indigo-400"></i> 迁移文献至其他资产包
+        </h3>
+        <button onclick="closeMoveSourceModal()" class="text-gray-400 hover:text-white p-1 rounded-lg">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div class="p-6 space-y-4">
+        <input type="hidden" id="moveSourceFromPkgId" value="">
+        <input type="hidden" id="moveSourceFile" value="">
+        <div class="text-xs text-gray-400">
+          将资料 <span id="moveSourceTitleLabel" class="text-white font-bold font-mono"></span> 移入以下目标资产包：
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-gray-300 mb-1.5">选择目标知识资产包:</label>
+          <select id="moveSourceTargetPkgSelect" class="w-full bg-gray-950 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"></select>
+        </div>
+      </div>
+      <div class="px-6 py-3 border-t border-gray-800 bg-gray-950/90 flex justify-end gap-2">
+        <button onclick="closeMoveSourceModal()" class="px-4 py-1.5 rounded-lg text-xs text-gray-400 hover:text-white hover:bg-gray-800 transition">取消</button>
+        <button onclick="submitMoveSource()" class="btn-gradient px-4 py-1.5 rounded-lg text-xs font-semibold text-white shadow transition">确认迁移</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rename Category Modal (重命名知识板块分类) -->
+  <div id="renameCategoryModal" class="fixed inset-0 bg-black/85 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-gray-900 border border-gray-700 w-full max-w-md rounded-2xl flex flex-col shadow-2xl overflow-hidden">
+      <div class="flex justify-between items-center px-6 py-4 border-b border-gray-800 bg-gray-950/80">
+        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+          <i class="fa-solid fa-tags text-indigo-400"></i> 重命名板块分类
+        </h3>
+        <button onclick="closeRenameCategoryModal()" class="text-gray-400 hover:text-white p-1 rounded-lg">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div class="p-6 space-y-4">
+        <input type="hidden" id="renameCatDomainKey" value="">
+        <input type="hidden" id="renameCatSubKey" value="">
+        <div class="grid grid-cols-4 gap-3">
+          <div class="col-span-1">
+            <label class="block text-xs font-semibold text-gray-300 mb-1.5">图标:</label>
+            <input type="text" id="renameCatIconInput" maxlength="4" class="w-full text-center bg-gray-950 border border-gray-700 rounded-xl px-2 py-2 text-sm text-white focus:outline-none focus:border-indigo-500">
+          </div>
+          <div class="col-span-3">
+            <label class="block text-xs font-semibold text-gray-300 mb-1.5">板块名称:</label>
+            <input type="text" id="renameCatNameInput" class="w-full bg-gray-950 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500">
+          </div>
+        </div>
+      </div>
+      <div class="px-6 py-3 border-t border-gray-800 bg-gray-950/90 flex justify-end gap-2">
+        <button onclick="closeRenameCategoryModal()" class="px-4 py-1.5 rounded-lg text-xs text-gray-400 hover:text-white hover:bg-gray-800 transition">取消</button>
+        <button onclick="submitRenameCategory()" class="btn-gradient px-4 py-1.5 rounded-lg text-xs font-semibold text-white shadow transition">保存修改</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     let taxonomyData = null;
     let currentDomain = 'all';
@@ -718,13 +952,23 @@ HTML_DASHBOARD = r"""
 
           html += `
             <div class="pt-1.5">
-              <div onclick="selectCategory('${domKey}', 'all', '${domInfo.name}')" 
-                class="px-2.5 py-1.5 rounded-xl cursor-pointer text-xs flex items-center justify-between transition border border-transparent hover:bg-gray-800/60 font-semibold ${isDomActive ? 'active-nav-item' : 'text-gray-200'}">
+              <div id="drop-target-${domKey}"
+                ondragover="handleCategoryDragOver(event, this)"
+                ondragleave="handleCategoryDragLeave(event, this)"
+                ondrop="handleCategoryDrop(event, '${domKey}', null, '${domInfo.name.replace(/'/g, "\\'")}', null)"
+                onclick="selectCategory('${domKey}', 'all', '${domInfo.name.replace(/'/g, "\\'")}')" 
+                class="px-2.5 py-1.5 rounded-xl cursor-pointer text-xs flex items-center justify-between transition border border-transparent hover:bg-gray-800/60 font-semibold group/dom ${isDomActive ? 'active-nav-item' : 'text-gray-200'}">
                 <span class="flex items-center gap-1.5 truncate">
                   <span>${domInfo.icon || '📁'}</span>
                   <span class="truncate">${domInfo.name}</span>
                 </span>
-                <span class="text-[10px] bg-gray-800/90 text-gray-400 px-1.5 py-0.2 rounded font-mono">${domTotal}</span>
+                <div class="flex items-center gap-1.5">
+                  <button onclick="openRenameCategoryModal(event, '${domKey}', null, '${domInfo.name.replace(/'/g, "\\'")}', '${domInfo.icon || '📁'}')"
+                    class="opacity-0 group-hover/dom:opacity-100 text-gray-500 hover:text-indigo-300 p-0.5 rounded transition" title="重命名此一级领域">
+                    <i class="fa-solid fa-pen text-[9px]"></i>
+                  </button>
+                  <span class="text-[10px] bg-gray-800/90 text-gray-400 px-1.5 py-0.2 rounded font-mono">${domTotal}</span>
+                </div>
               </div>
               <div class="pl-4 space-y-0.5 mt-0.5 border-l border-gray-800/80 ml-2">
           `;
@@ -733,13 +977,23 @@ HTML_DASHBOARD = r"""
             const count = domStats[subKey] || 0;
             const isSubActive = currentDomain === domKey && currentSubCategory === subKey;
             html += `
-              <div onclick="selectCategory('${domKey}', '${subKey}', '${subInfo.name}')" 
-                class="px-2 py-1 rounded-lg cursor-pointer text-[11px] flex items-center justify-between transition hover:bg-gray-800/50 ${isSubActive ? 'active-nav-item' : 'text-gray-400 hover:text-gray-200'}">
+              <div id="drop-target-${domKey}-${subKey}"
+                ondragover="handleCategoryDragOver(event, this)"
+                ondragleave="handleCategoryDragLeave(event, this)"
+                ondrop="handleCategoryDrop(event, '${domKey}', '${subKey}', '${domInfo.name.replace(/'/g, "\\'")}', '${subInfo.name.replace(/'/g, "\\'")}')"
+                onclick="selectCategory('${domKey}', '${subKey}', '${subInfo.name.replace(/'/g, "\\'")}')" 
+                class="px-2 py-1 rounded-lg cursor-pointer text-[11px] flex items-center justify-between transition hover:bg-gray-800/50 group/sub ${isSubActive ? 'active-nav-item' : 'text-gray-400 hover:text-gray-200'}">
                 <span class="flex items-center gap-1.5 truncate">
                   <span class="text-[10px]">${subInfo.icon || '📌'}</span>
                   <span class="truncate">${subInfo.name}</span>
                 </span>
-                <span class="text-[10px] ${count > 0 ? 'text-indigo-400 font-bold' : 'text-gray-600'} font-mono">${count}</span>
+                <div class="flex items-center gap-1">
+                  <button onclick="openRenameCategoryModal(event, '${domKey}', '${subKey}', '${subInfo.name.replace(/'/g, "\\'")}', '${subInfo.icon || '📌'}')"
+                    class="opacity-0 group-hover/sub:opacity-100 text-gray-500 hover:text-indigo-300 p-0.5 rounded transition" title="重命名此子板块">
+                    <i class="fa-solid fa-pen text-[9px]"></i>
+                  </button>
+                  <span class="text-[10px] ${count > 0 ? 'text-indigo-400 font-bold' : 'text-gray-600'} font-mono">${count}</span>
+                </div>
               </div>
             `;
           }
@@ -799,27 +1053,42 @@ HTML_DASHBOARD = r"""
         }
 
         container.innerHTML = data.packages.map(p => `
-          <div onclick="selectPackage('${p.id}')" 
-            class="glass-card hover:border-indigo-500/60 transition p-3.5 rounded-xl cursor-pointer relative group ${activePackageId === p.id ? 'active-pkg-card' : ''}">
+          <div draggable="true"
+            id="pkg-card-${p.id}"
+            ondragstart="handlePkgDragStart(event, '${p.id}', '${p.name.replace(/'/g, "\\'")}', '${p.domain}', '${p.sub_category}')"
+            ondragend="handlePkgDragEnd(event)"
+            onclick="selectPackage('${p.id}')" 
+            class="glass-card hover:border-indigo-500/60 transition p-3.5 rounded-xl cursor-grab active:cursor-grabbing relative group ${activePackageId === p.id ? 'active-pkg-card' : ''}">
             <div class="flex justify-between items-start mb-1">
-              <div class="pr-6">
+              <div class="pr-2">
                 <div class="flex items-center gap-1.5 text-[10px] text-indigo-400 font-mono">
+                  <i class="fa-solid fa-grip-vertical text-gray-600 hover:text-gray-400 cursor-grab" title="按住可拖拽至左侧任意板块调整从属"></i>
                   <span>${p.domain_icon || '📁'} ${p.domain_name || '通用'}</span>
                   <span>/</span>
                   <span class="text-gray-400">${p.sub_category_name || p.sub_category || '默认'}</span>
                 </div>
                 <h4 class="font-bold text-white text-xs mt-0.5 leading-snug">${p.name}</h4>
               </div>
-              <span class="text-[10px] px-1.5 py-0.5 bg-indigo-950/70 text-indigo-300 rounded border border-indigo-800/50 shrink-0 font-mono">${p.item_count} 条</span>
+              <div class="flex items-center gap-1 shrink-0">
+                <span class="text-[10px] px-1.5 py-0.5 bg-indigo-950/70 text-indigo-300 rounded border border-indigo-800/50 font-mono">${p.item_count} 条</span>
+              </div>
             </div>
             <p class="text-[11px] text-gray-400 line-clamp-2 mb-2 leading-relaxed">${p.description}</p>
             <div class="flex items-center justify-between pt-1">
               <div class="flex flex-wrap gap-1">
                 ${(p.tags || []).slice(0, 3).map(t => `<span class="text-[9px] bg-gray-900 text-gray-300 px-1.5 py-0.5 rounded border border-gray-800">${t}</span>`).join('')}
               </div>
-              <button onclick="deletePackage(event, '${p.id}', '${p.name}')" class="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-rose-400 p-1 transition" title="彻底删除此资产包">
-                <i class="fa-regular fa-trash-can text-xs"></i>
-              </button>
+              <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
+                <button onclick="openMovePackageModal(event, '${p.id}', '${p.name.replace(/'/g, "\\'")}', '${p.domain}', '${p.sub_category}')" class="text-gray-500 hover:text-indigo-400 p-1 rounded hover:bg-gray-800 transition" title="调整所属板块 (可点击选择或直接拖拽)">
+                  <i class="fa-solid fa-arrows-up-down-left-right text-xs"></i>
+                </button>
+                <button onclick="openRenamePackageModal(event, '${p.id}', '${p.name.replace(/'/g, "\\'")}', '${(p.description || '').replace(/'/g, "\\'")}')" class="text-gray-500 hover:text-indigo-400 p-1 rounded hover:bg-gray-800 transition" title="重命名资产包与简介">
+                  <i class="fa-solid fa-pen-to-square text-xs"></i>
+                </button>
+                <button onclick="deletePackage(event, '${p.id}', '${p.name.replace(/'/g, "\\'")}')" class="text-gray-500 hover:text-rose-400 p-1 rounded hover:bg-gray-800 transition" title="彻底删除此资产包">
+                  <i class="fa-regular fa-trash-can text-xs"></i>
+                </button>
+              </div>
             </div>
           </div>
         `).join('');
@@ -928,8 +1197,16 @@ HTML_DASHBOARD = r"""
                   <span>></span>
                   <span class="text-gray-400">#${p.id}</span>
                 </div>
-                <h2 class="text-lg font-bold text-white tracking-tight">${p.name}</h2>
-                <p class="text-xs text-gray-400 mt-0.5">${p.description}</p>
+                <div class="flex items-center gap-2">
+                  <h2 class="text-lg font-bold text-white tracking-tight">${p.name}</h2>
+                  <button onclick="openRenamePackageModal(event, '${p.id}', '${p.name.replace(/'/g, "\\'")}', '${(p.description || '').replace(/'/g, "\\'")}')" class="text-gray-400 hover:text-indigo-400 p-1 transition" title="重命名资产包与简介">
+                    <i class="fa-solid fa-pen-to-square text-sm"></i>
+                  </button>
+                  <button onclick="openMovePackageModal(event, '${p.id}', '${p.name.replace(/'/g, "\\'")}', '${p.domain}', '${p.sub_category}')" class="text-[11px] px-2.5 py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg flex items-center gap-1.5 transition ml-1" title="调整所属板块 (可点击选择或直接拖拽)">
+                    <i class="fa-solid fa-arrows-up-down-left-right text-indigo-400"></i> 移动板块
+                  </button>
+                </div>
+                <p class="text-xs text-gray-400 mt-1 max-w-2xl">${p.description}</p>
               </div>
               <div class="flex flex-wrap gap-2 shrink-0">
                 <button onclick="exportToAgent('${p.id}', 'cursor')" class="btn-agent hover:opacity-90 text-white px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 shadow" title="复制为 Cursor Rule 上下文">
@@ -1010,6 +1287,12 @@ HTML_DASHBOARD = r"""
                         原网 <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
                       </a>
                     ` : ''}
+                    <button onclick="openRenameSourceModal('${p.id}', '${s.file}', '${(s.title || '').replace(/'/g, "\\'")}')" class="text-gray-500 hover:text-indigo-400 p-1.5 rounded-lg hover:bg-gray-800 transition" title="重命名此资料标题">
+                      <i class="fa-solid fa-pen-to-square"></i>
+                    </button>
+                    <button onclick="openMoveSourceModal('${p.id}', '${s.file}', '${(s.title || '').replace(/'/g, "\\'")}')" class="text-gray-500 hover:text-indigo-400 p-1.5 rounded-lg hover:bg-gray-800 transition" title="迁移至其他资产包">
+                      <i class="fa-solid fa-arrow-right-to-bracket"></i>
+                    </button>
                     <button onclick="deleteSource('${p.id}', '${s.file}')" class="text-gray-500 hover:text-rose-400 p-1.5 rounded-lg hover:bg-gray-800 transition" title="删除此资料文件">
                       <i class="fa-regular fa-trash-can"></i>
                     </button>
@@ -1578,6 +1861,330 @@ HTML_DASHBOARD = r"""
       }
     }
 
+    // --- 拖拽调整资产包从属板块 (HTML5 Drag & Drop) ---
+    let draggedPkgId = null;
+    let draggedPkgName = null;
+
+    function handlePkgDragStart(e, pkgId, pkgName, domain, sub) {
+      draggedPkgId = pkgId;
+      draggedPkgName = pkgName;
+      e.dataTransfer.setData('text/plain', pkgId);
+      e.dataTransfer.effectAllowed = 'move';
+      const card = document.getElementById(`pkg-card-${pkgId}`);
+      if (card) {
+        card.classList.add('opacity-40', 'border-indigo-400', 'border-dashed');
+      }
+    }
+
+    function handlePkgDragEnd(e) {
+      const cards = document.querySelectorAll('.active-pkg-card, .glass-card');
+      cards.forEach(c => c.classList.remove('opacity-40', 'border-indigo-400', 'border-dashed'));
+      document.querySelectorAll('[id^="drop-target-"]').forEach(el => {
+        el.classList.remove('bg-indigo-900/60', 'ring-2', 'ring-indigo-400', 'text-white');
+      });
+    }
+
+    function handleCategoryDragOver(e, el) {
+      e.preventDefault();
+      e.stopPropagation();
+      e.dataTransfer.dropEffect = 'move';
+      el.classList.add('bg-indigo-900/60', 'ring-2', 'ring-indigo-400', 'text-white');
+    }
+
+    function handleCategoryDragLeave(e, el) {
+      e.preventDefault();
+      e.stopPropagation();
+      el.classList.remove('bg-indigo-900/60', 'ring-2', 'ring-indigo-400', 'text-white');
+    }
+
+    async function handleCategoryDrop(e, domKey, subKey, domName, subName) {
+      e.preventDefault();
+      e.stopPropagation();
+      const el = e.currentTarget;
+      el.classList.remove('bg-indigo-900/60', 'ring-2', 'ring-indigo-400', 'text-white');
+      const pkgId = e.dataTransfer.getData('text/plain') || draggedPkgId;
+      if (!pkgId) return;
+
+      try {
+        const res = await fetch(`/api/packages/${pkgId}/move`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ domain: domKey, sub_category: subKey || null })
+        });
+        const result = await res.json();
+        if (res.ok) {
+          showToast(`已成功将【${draggedPkgName || pkgId}】拖拽移动至【${domName}${subName ? ' > ' + subName : ''}】！`);
+          await loadTaxonomy();
+          await loadPackages();
+          if (activePackageId === pkgId) {
+            selectPackage(pkgId);
+          }
+        } else {
+          showToast('调整板块失败: ' + (result.detail || result.message), false);
+        }
+      } catch (err) {
+        showToast('调整板块出错: ' + err.message, false);
+      }
+    }
+
+    // --- 11. 重命名资产包 ---
+    function openRenamePackageModal(e, pkgId, name, desc = '') {
+      if (e) e.stopPropagation();
+      document.getElementById('renamePkgId').value = pkgId;
+      document.getElementById('renamePkgNameInput').value = name;
+      document.getElementById('renamePkgDescInput').value = desc;
+      document.getElementById('renamePackageModal').classList.remove('hidden');
+      document.getElementById('renamePkgNameInput').focus();
+    }
+
+    function closeRenamePackageModal() {
+      document.getElementById('renamePackageModal').classList.add('hidden');
+    }
+
+    async function submitRenamePackage() {
+      const pkgId = document.getElementById('renamePkgId').value;
+      const name = document.getElementById('renamePkgNameInput').value.trim();
+      const desc = document.getElementById('renamePkgDescInput').value.trim();
+      if (!name) {
+        alert('请输入资产包名称');
+        return;
+      }
+      try {
+        const res = await fetch(`/api/packages/${pkgId}/rename`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ name, description: desc })
+        });
+        const result = await res.json();
+        if (res.ok) {
+          showToast(`资产包已成功重命名为「${name}」！`);
+          closeRenamePackageModal();
+          await loadPackages();
+          if (activePackageId === pkgId) {
+            selectPackage(pkgId);
+          }
+        } else {
+          showToast('重命名失败: ' + (result.detail || result.message), false);
+        }
+      } catch (err) {
+        showToast('重命名请求错误: ' + err.message, false);
+      }
+    }
+
+    // --- 12. 调整资产包从属板块 (弹窗选择) ---
+    function openMovePackageModal(e, pkgId, name, currentDom, currentSub) {
+      if (e) e.stopPropagation();
+      document.getElementById('movePkgId').value = pkgId;
+      document.getElementById('movePkgNameLabel').innerText = name;
+      
+      const domSelect = document.getElementById('movePkgDomainSelect');
+      domSelect.innerHTML = '';
+      if (taxonomyData && taxonomyData.domains) {
+        for (const [dk, dv] of Object.entries(taxonomyData.domains)) {
+          const opt = document.createElement('option');
+          opt.value = dk;
+          opt.innerText = `${dv.icon || '📁'} ${dv.name}`;
+          if (dk === currentDom) opt.selected = true;
+          domSelect.appendChild(opt);
+        }
+      }
+      handleMoveDomainChange(currentSub);
+      document.getElementById('movePackageModal').classList.remove('hidden');
+    }
+
+    function handleMoveDomainChange(selectedSub = null) {
+      const dom = document.getElementById('movePkgDomainSelect').value;
+      const subSelect = document.getElementById('movePkgSubSelect');
+      subSelect.innerHTML = '';
+      if (!dom || !taxonomyData || !taxonomyData.domains[dom]) return;
+      const subs = taxonomyData.domains[dom].sub_categories || {};
+      for (const [sk, sv] of Object.entries(subs)) {
+        const opt = document.createElement('option');
+        opt.value = sk;
+        opt.innerText = `${sv.icon || '📌'} ${sv.name}`;
+        if (selectedSub && sk === selectedSub) opt.selected = true;
+        subSelect.appendChild(opt);
+      }
+    }
+
+    function closeMovePackageModal() {
+      document.getElementById('movePackageModal').classList.add('hidden');
+    }
+
+    async function submitMovePackage() {
+      const pkgId = document.getElementById('movePkgId').value;
+      const domain = document.getElementById('movePkgDomainSelect').value;
+      const sub = document.getElementById('movePkgSubSelect').value;
+      try {
+        const res = await fetch(`/api/packages/${pkgId}/move`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ domain, sub_category: sub })
+        });
+        const result = await res.json();
+        if (res.ok) {
+          showToast('资产包板块归属已成功更新！');
+          closeMovePackageModal();
+          await loadTaxonomy();
+          await loadPackages();
+          if (activePackageId === pkgId) {
+            selectPackage(pkgId);
+          }
+        } else {
+          showToast('调整归属失败: ' + (result.detail || result.message), false);
+        }
+      } catch (err) {
+        showToast('调整归属出错: ' + err.message, false);
+      }
+    }
+
+    // --- 13. 重命名单篇文献资料 ---
+    function openRenameSourceModal(pkgId, file, title) {
+      document.getElementById('renameSourcePkgId').value = pkgId;
+      document.getElementById('renameSourceFile').value = file;
+      document.getElementById('renameSourceTitleInput').value = title;
+      document.getElementById('renameSourceModal').classList.remove('hidden');
+      document.getElementById('renameSourceTitleInput').focus();
+    }
+
+    function closeRenameSourceModal() {
+      document.getElementById('renameSourceModal').classList.add('hidden');
+    }
+
+    async function submitRenameSource() {
+      const pkgId = document.getElementById('renameSourcePkgId').value;
+      const file = document.getElementById('renameSourceFile').value;
+      const new_title = document.getElementById('renameSourceTitleInput').value.trim();
+      if (!new_title) {
+        alert('请输入资料标题');
+        return;
+      }
+      try {
+        const res = await fetch(`/api/packages/${pkgId}/sources/rename`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ file, new_title })
+        });
+        const result = await res.json();
+        if (res.ok) {
+          showToast(`文献标题已更新为「${new_title}」！`);
+          closeRenameSourceModal();
+          selectPackage(pkgId);
+        } else {
+          showToast('重命名失败: ' + (result.detail || result.message), false);
+        }
+      } catch (err) {
+        showToast('重命名出错: ' + err.message, false);
+      }
+    }
+
+    // --- 14. 迁移单篇资料到其他资产包 ---
+    async function openMoveSourceModal(pkgId, file, title) {
+      document.getElementById('moveSourceFromPkgId').value = pkgId;
+      document.getElementById('moveSourceFile').value = file;
+      document.getElementById('moveSourceTitleLabel').innerText = title;
+
+      const targetSelect = document.getElementById('moveSourceTargetPkgSelect');
+      targetSelect.innerHTML = '<option value="">正在加载目标资产包...</option>';
+      document.getElementById('moveSourceModal').classList.remove('hidden');
+
+      try {
+        const res = await fetch('/api/packages');
+        const data = await res.json();
+        targetSelect.innerHTML = '';
+        (data.packages || []).forEach(p => {
+          if (p.id !== pkgId) {
+            const opt = document.createElement('option');
+            opt.value = p.id;
+            opt.innerText = `${p.domain_icon || '📁'} [${p.domain_name}] ${p.name}`;
+            targetSelect.appendChild(opt);
+          }
+        });
+        if (targetSelect.options.length === 0) {
+          targetSelect.innerHTML = '<option value="">无其他资产包可选</option>';
+        }
+      } catch (e) {
+        targetSelect.innerHTML = '<option value="">加载资产包列表失败</option>';
+      }
+    }
+
+    function closeMoveSourceModal() {
+      document.getElementById('moveSourceModal').classList.add('hidden');
+    }
+
+    async function submitMoveSource() {
+      const fromPkgId = document.getElementById('moveSourceFromPkgId').value;
+      const file = document.getElementById('moveSourceFile').value;
+      const targetPkgId = document.getElementById('moveSourceTargetPkgSelect').value;
+      if (!targetPkgId) {
+        alert('请选择目标资产包');
+        return;
+      }
+      try {
+        const res = await fetch(`/api/packages/${fromPkgId}/sources/move`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ file, target_package_id: targetPkgId })
+        });
+        const result = await res.json();
+        if (res.ok) {
+          showToast('文献已成功迁移至目标资产包并完成知识矩阵重构！');
+          closeMoveSourceModal();
+          await loadTaxonomy();
+          await loadPackages();
+          selectPackage(fromPkgId);
+        } else {
+          showToast('迁移文献失败: ' + (result.detail || result.message), false);
+        }
+      } catch (err) {
+        showToast('迁移文献出错: ' + err.message, false);
+      }
+    }
+
+    // --- 15. 重命名知识板块分类 ---
+    function openRenameCategoryModal(e, domKey, subKey, currentName, currentIcon) {
+      if (e) e.stopPropagation();
+      document.getElementById('renameCatDomainKey').value = domKey;
+      document.getElementById('renameCatSubKey').value = subKey || '';
+      document.getElementById('renameCatNameInput').value = currentName;
+      document.getElementById('renameCatIconInput').value = currentIcon || '📁';
+      document.getElementById('renameCategoryModal').classList.remove('hidden');
+      document.getElementById('renameCatNameInput').focus();
+    }
+
+    function closeRenameCategoryModal() {
+      document.getElementById('renameCategoryModal').classList.add('hidden');
+    }
+
+    async function submitRenameCategory() {
+      const domain_key = document.getElementById('renameCatDomainKey').value;
+      const sub_key = document.getElementById('renameCatSubKey').value || null;
+      const new_name = document.getElementById('renameCatNameInput').value.trim();
+      const new_icon = document.getElementById('renameCatIconInput').value.trim();
+      if (!new_name) {
+        alert('请输入分类名称');
+        return;
+      }
+      try {
+        const res = await fetch('/api/taxonomy/rename', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ domain_key, sub_key, new_name, new_icon })
+        });
+        const result = await res.json();
+        if (res.ok) {
+          showToast(`板块已重命名为「${new_icon} ${new_name}」！`);
+          closeRenameCategoryModal();
+          await loadTaxonomy();
+          await loadPackages();
+        } else {
+          showToast('重命名分类失败: ' + (result.detail || result.message), false);
+        }
+      } catch (err) {
+        showToast('重命名分类出错: ' + err.message, false);
+      }
+    }
+
     // 快捷键支持
     window.addEventListener('keydown', (e) => {
       if (e.key === '/' && document.activeElement.tagName !== 'INPUT') {
@@ -1588,6 +2195,11 @@ HTML_DASHBOARD = r"""
         closeReaderModal();
         closeVideoModal();
         closeLightboxModal();
+        closeRenamePackageModal();
+        closeMovePackageModal();
+        closeRenameSourceModal();
+        closeMoveSourceModal();
+        closeRenameCategoryModal();
       }
     });
 

@@ -171,6 +171,202 @@ class KnowledgePackageManager:
         logger.info(f"Deleted source {source_filename} from package {package_id} and re-synthesized.")
         return True
 
+    def rename_package(self, package_id: str, new_name: str, new_description: Optional[str] = None) -> bool:
+        """直接重命名知识资产包名称与定位简介，并同步更新聚合体系大纲"""
+        pkg_dir = self.packages_dir / package_id
+        meta_file = pkg_dir / "package.yaml"
+        if not meta_file.exists():
+            return False
+        with open(meta_file, "r", encoding="utf-8") as f:
+            meta = yaml.safe_load(f) or {}
+
+        clean_name = new_name.strip()
+        if not clean_name:
+            return False
+        meta["name"] = clean_name
+        if new_description is not None:
+            meta["description"] = new_description.strip()
+        meta["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        with open(meta_file, "w", encoding="utf-8") as f:
+            yaml.safe_dump(meta, f, allow_unicode=True, sort_keys=False)
+
+        self.synthesize_package(package_id)
+        logger.info(f"Renamed package {package_id} to '{clean_name}'.")
+        return True
+
+    def move_package(self, package_id: str, new_domain: str, new_sub_category: Optional[str] = None) -> bool:
+        """调整知识资产包的一级领域与二级子方向归属（支持拖拽或面板调整）"""
+        pkg_dir = self.packages_dir / package_id
+        meta_file = pkg_dir / "package.yaml"
+        if not meta_file.exists():
+            return False
+        with open(meta_file, "r", encoding="utf-8") as f:
+            meta = yaml.safe_load(f) or {}
+
+        domain_key = resolve_domain(new_domain)
+        dom_info = PRIMARY_DOMAINS.get(domain_key, PRIMARY_DOMAINS.get("inbox", {}))
+        domain_name = dom_info.get("name", domain_key)
+        domain_icon = dom_info.get("icon", "📁")
+
+        sub_cats = dom_info.get("sub_categories", {})
+        sub_id = new_sub_category or (list(sub_cats.keys())[0] if sub_cats else "general")
+        sub_info = sub_cats.get(sub_id, {})
+        sub_name = sub_info.get("name", sub_id)
+        sub_icon = sub_info.get("icon", "📌")
+
+        meta["domain"] = domain_key
+        meta["domain_name"] = domain_name
+        meta["domain_icon"] = domain_icon
+        meta["sub_category"] = sub_id
+        meta["sub_category_name"] = sub_name
+        meta["sub_category_icon"] = sub_icon
+        meta["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        # 同步更新标签
+        tags = set(meta.get("tags", []))
+        tags.add(domain_name)
+        tags.add(sub_name)
+        meta["tags"] = list(tags)[:12]
+
+        with open(meta_file, "w", encoding="utf-8") as f:
+            yaml.safe_dump(meta, f, allow_unicode=True, sort_keys=False)
+
+        self.synthesize_package(package_id)
+        logger.info(f"Moved package {package_id} to [{domain_name} > {sub_name}].")
+        return True
+
+    def rename_source(self, package_id: str, source_filename: str, new_title: str) -> bool:
+        """直接重命名单篇文献资料的标题，并同步更新 Markdown 元数据与大纲"""
+        pkg_dir = self.packages_dir / package_id
+        meta_file = pkg_dir / "package.yaml"
+        if not meta_file.exists():
+            return False
+        with open(meta_file, "r", encoding="utf-8") as f:
+            meta = yaml.safe_load(f) or {}
+
+        clean_title = new_title.strip()
+        if not clean_title:
+            return False
+
+        found_source = None
+        for s in meta.get("sources", []):
+            if s.get("file") == source_filename or Path(s.get("file")).name == Path(source_filename).name:
+                s["title"] = clean_title
+                found_source = s
+                break
+
+        if not found_source:
+            return False
+
+        # 更新 source markdown 实体文件中的 frontmatter 和一级标题
+        target_file = pkg_dir / found_source.get("file")
+        if target_file.exists():
+            content = target_file.read_text(encoding="utf-8")
+            if content.startswith("---"):
+                parts = content.split("---", 2)
+                if len(parts) >= 3:
+                    fm = yaml.safe_load(parts[1]) or {}
+                    fm["title"] = clean_title
+                    fm_str = yaml.safe_dump(fm, allow_unicode=True, sort_keys=False)
+                    body = parts[2]
+                    body_lines = body.splitlines()
+                    for idx, line in enumerate(body_lines):
+                        if line.startswith("# "):
+                            body_lines[idx] = f"# {clean_title}"
+                            break
+                    target_file.write_text(f"---\n{fm_str}---\n" + "\n".join(body_lines), encoding="utf-8")
+
+        meta["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        with open(meta_file, "w", encoding="utf-8") as f:
+            yaml.safe_dump(meta, f, allow_unicode=True, sort_keys=False)
+
+        self.synthesize_package(package_id)
+        logger.info(f"Renamed source {source_filename} in {package_id} to '{clean_title}'.")
+        return True
+
+    def move_source(self, from_package_id: str, to_package_id: str, source_filename: str) -> bool:
+        """将某篇文献资料迁移至另一个资产包中（含关键帧、本地离线图片与代码片段）"""
+        from_dir = self.packages_dir / from_package_id
+        to_dir = self.packages_dir / to_package_id
+        if not from_dir.exists() or not to_dir.exists() or from_package_id == to_package_id:
+            return False
+
+        from_meta_file = from_dir / "package.yaml"
+        to_meta_file = to_dir / "package.yaml"
+        with open(from_meta_file, "r", encoding="utf-8") as f:
+            from_meta = yaml.safe_load(f) or {}
+        with open(to_meta_file, "r", encoding="utf-8") as f:
+            to_meta = yaml.safe_load(f) or {}
+
+        # 找到目标 source
+        target_source = None
+        new_from_sources = []
+        for s in from_meta.get("sources", []):
+            if s.get("file") == source_filename or Path(s.get("file")).name == Path(source_filename).name:
+                target_source = s
+            else:
+                new_from_sources.append(s)
+
+        if not target_source:
+            return False
+
+        # 物理迁移 markdown 源文件
+        src_file = from_dir / target_source.get("file")
+        if not src_file.exists():
+            return False
+
+        dest_src_file = to_dir / "sources" / src_file.name
+        dest_src_file.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(src_file), str(dest_src_file))
+
+        # 读取 frontmatter 并迁移关联的 keyframes, assets, snippets
+        content = dest_src_file.read_text(encoding="utf-8")
+        if content.startswith("---"):
+            parts = content.split("---", 2)
+            if len(parts) >= 3:
+                fm = yaml.safe_load(parts[1]) or {}
+                for kf in fm.get("keyframes", []):
+                    kf_src = from_dir / kf
+                    if kf_src.exists():
+                        kf_dest = to_dir / "keyframes" / kf_src.name
+                        kf_dest.parent.mkdir(parents=True, exist_ok=True)
+                        shutil.copy2(str(kf_src), str(kf_dest))
+                for ast in fm.get("assets", []):
+                    ast_src = from_dir / ast
+                    if ast_src.exists():
+                        ast_dest = to_dir / "assets" / ast_src.name
+                        ast_dest.parent.mkdir(parents=True, exist_ok=True)
+                        shutil.copy2(str(ast_src), str(ast_dest))
+                for snip in fm.get("snippets", []):
+                    snip_src = from_dir / snip
+                    if snip_src.exists():
+                        snip_dest = to_dir / "snippets" / snip_src.name
+                        snip_dest.parent.mkdir(parents=True, exist_ok=True)
+                        shutil.copy2(str(snip_src), str(snip_dest))
+
+        # 更新双方 package.yaml
+        from_meta["sources"] = new_from_sources
+        from_meta["item_count"] = len(new_from_sources)
+        from_meta["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        with open(from_meta_file, "w", encoding="utf-8") as f:
+            yaml.safe_dump(from_meta, f, allow_unicode=True, sort_keys=False)
+
+        target_source["file"] = f"sources/{dest_src_file.name}"
+        to_sources = to_meta.get("sources", [])
+        to_sources.append(target_source)
+        to_meta["sources"] = to_sources
+        to_meta["item_count"] = len(to_sources)
+        to_meta["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        with open(to_meta_file, "w", encoding="utf-8") as f:
+            yaml.safe_dump(to_meta, f, allow_unicode=True, sort_keys=False)
+
+        # 重新双向合成
+        self.synthesize_package(from_package_id)
+        self.synthesize_package(to_package_id)
+        logger.info(f"Moved source {source_filename} from {from_package_id} to {to_package_id}.")
+        return True
+
     def route_item_to_package(
         self,
         item: IngestedItem,
