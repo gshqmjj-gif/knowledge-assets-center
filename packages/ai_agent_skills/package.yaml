@@ -1,0 +1,50 @@
+id: ai_agent_skills
+name: Agent 编程测试驱动与工程规范技能包
+description: 先提问确认需求、再编写测试用例、最后交付工程代码的高阶 AI 编程技能包架构
+domain: ai_tech
+domain_name: AI科技与大模型
+domain_icon: 🤖
+sub_category: agent_skills
+sub_category_name: 智能体编程技能与工程规范
+sub_category_icon: 🤖
+tags:
+- AI科技与大模型
+- 智能体编程技能与工程规范
+- 知识资产
+created_at: '2026-10-29 03:00:53'
+updated_at: '2026-10-29 03:00:53'
+item_count: 1
+sources:
+- id: bilibili_video_20261027_skills：让_AI_先问清楚、再写测试的编程技能包
+  title: skills：让 AI 先问清楚、再写测试的编程技能包
+  type: bilibili_video
+  url: https://www.bilibili.com/video/BV1UAn36aEX3?t=101
+  author: 洛克AI
+  file: sources/20261027_bilibili_video_skills：让_AI_先问清楚、再写测试的编程技能包.md
+  ingested_at: '2026-10-27 05:28:01'
+  keyframes_count: 2
+  snippets_count: 1
+  associated_entity: skills：让 AI 先问清楚、再写测
+  incremental_merged: false
+knowledge_matrix:
+- entity_name: skills：让 AI 先问清楚、再写测
+  domain: ai_tech
+  archetype: creative_multimodal
+  core_function: '核心解决痛点: 让 AI 先问清楚、再写测试的编程技能包；装上之后你的 AI 能多做什么: 让 AI 先问清楚、再写测试的编程技能包，显著突破传统工作流瓶颈。'
+  hardware_specs: '硬件要求: 标准配置 (任意现代计算机，无特殊硬件要求) / 运行环境: Claude Code / Cursor / Windsurf
+    编程环境'
+  environment: '硬件要求: 标准配置 (任意现代计算机，无特殊硬件要求) + 运行环境: Claude Code / Cursor / Windsurf
+    编程环境'
+  local_deployable: '本地化支持: 🟢 100% 本地规则注入 (纯 Markdown / Rules 规范，随项目 Git 仓库协同版本化)'
+  competitive_advantages:
+  - 【Grill-Me 反向拷问】AI 动笔前先反过来深挖需求边界与异常场景，把关键分支问清楚再写代码。
+  - 【TDD 测试先行闭环】AI 先写一个会失败的测试亮红灯，再改代码让其变绿，每一步都有严谨反馈。
+  - 【架构健康度体检】内置 8 项架构定期排查流程，避免代码腐化与盲目扩张。
+  limitations_and_pitfalls:
+  - 【避免过度死板】快速原型探索阶段全量开启 TDD 和问询流程会略微增加交互轮次，推荐在生产重构时启用。
+  quickstart_commands:
+  - git clone https://github.com/mattpocock/skills
+  key_insights: []
+  sources_contributed:
+  - 洛克AI
+  merged_sources_count: 1

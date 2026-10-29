@@ -48,25 +48,57 @@ PRIMARY_DOMAINS = {
                 "icon": "⚡",
                 "keywords": ["逆向", "复刻", "reverse", "decompil", "rea", "pentagi", "ghidra", "ida", "反编译", "软件复刻"]
             },
-            "ai_video": {
-                "name": "AI视频与多模态创作",
-                "icon": "🎬",
-                "keywords": ["视频", "video", "opus", "runway", "sora", "cogvideo", "分镜", "关键帧", "剪辑", "视觉生成"]
-            },
-            "ai_agents": {
-                "name": "智能体与工作流自动化",
-                "icon": "🤖",
-                "keywords": ["agent", "智能体", "mcp", "工作流", "langchain", "autogen", "crewai", "prompt", "提示词"]
-            },
             "local_llm": {
                 "name": "本地大模型与端侧推理优化",
                 "icon": "🧠",
-                "keywords": ["本地", "ollama", "rag", "知识库", "微调", "vllm", "llama", "airllm", "显存", "端侧", "推理优化", "私有化", "embedding", "向量检索"]
+                "keywords": ["本地", "ollama", "rag", "知识库", "微调", "vllm", "llama", "airllm", "显存", "端侧", "推理优化", "私有化", "embedding", "向量检索", "4gb", "70b"]
+            },
+            "coding_proxy": {
+                "name": "编程助手代理与模型路由",
+                "icon": "🌐",
+                "keywords": ["free-claude-code", "claude code", "codex", "代理", "路由", "免费额度", "token路由", "故障转移", "反向代理", "proxy"]
+            },
+            "agent_memory": {
+                "name": "智能体长期记忆与上下文",
+                "icon": "💾",
+                "keywords": ["claude-mem", "长期记忆", "跨对话", "记忆检索", "agent memory", "持久化记忆", "上下文缓存"]
+            },
+            "agent_skills": {
+                "name": "智能体编程技能与工程规范",
+                "icon": "🤖",
+                "keywords": ["skills", "技能包", "tdd", "测试驱动", "编程规范", "agent skills", "工程技能", "mcp", "工作流", "提示词规范"]
             },
             "visual_design": {
                 "name": "架构可视化与技术图解",
                 "icon": "📊",
                 "keywords": ["架构图", "技术图解", "diagram", "时序图", "流程图", "excalidraw", "mermaid", "svg", "图解规矩", "视觉呈现"]
+            }
+        }
+    },
+    "ai_video": {
+        "name": "AI视频制作与数字人",
+        "icon": "🎬",
+        "aliases": ["AI视频", "视频制作", "数字人", "视频", "ai_video", "video", "短剧", "漫剧", "口型", "多模态视频", "视频生成"],
+        "sub_categories": {
+            "digital_human": {
+                "name": "AI数字人与口型音频驱动",
+                "icon": "👤",
+                "keywords": ["infinitetalk", "数字人", "口型", "全身数字人", "音频驱动", "dubbing", "sadtalker", "liveportrait", "wav2lip", "meigen", "稀疏帧", "说话人", "数字分身", "虚拟人"]
+            },
+            "video_workflow": {
+                "name": "AI视频剪辑与自动化工坊",
+                "icon": "🎬",
+                "keywords": ["openmontage", "workbuddy", "libtv", "视频工坊", "剪辑", "短剧", "漫剧", "分镜视频", "视频制作", "montage", "视频自动化", "视频助手", "智能剪辑"]
+            },
+            "storyboard_creative": {
+                "name": "大模型分镜与视觉故事板",
+                "icon": "🎞️",
+                "keywords": ["opus", "分镜设计", "故事板", "创意工作流", "提示词分镜", "导演流", "claude opus", "分镜", "创意视频", "视觉创意"]
+            },
+            "video_generation": {
+                "name": "文生视频与多模态大模型",
+                "icon": "🎥",
+                "keywords": ["sora", "cogvideo", "runway", "kling", "hunyuanvideo", "文生视频", "图生视频", "视频大模型", "生成模型", "快手可灵", "海螺", "可灵", "vidu"]
             }
         }
     },

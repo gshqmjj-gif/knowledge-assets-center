@@ -289,8 +289,8 @@ class BilibiliVideoCrawler(BaseCrawler):
                 },
                 "skills": {
                     "domain": "ai_tech",
-                    "sub_category": "ai_agents",
-                    "preferred_package": "ai_tech_ai_agents",
+                    "sub_category": "agent_skills",
+                    "preferred_package": "ai_agent_skills",
                     "concept_offset": 11,
                     "demo_offset": 37,
                     "machine_name": "FIG 02 技能卡带控制台",
@@ -328,9 +328,9 @@ class BilibiliVideoCrawler(BaseCrawler):
                     ]
                 },
                 "openmontage": {
-                    "domain": "ai_tech",
-                    "sub_category": "ai_video",
-                    "preferred_package": "ai_video_creative",
+                    "domain": "ai_video",
+                    "sub_category": "video_workflow",
+                    "preferred_package": "ai_video_workflow_montage",
                     "concept_offset": 9,
                     "demo_offset": 36,
                     "machine_name": "FIG 04 视频切片暗房",
@@ -349,8 +349,8 @@ class BilibiliVideoCrawler(BaseCrawler):
                 },
                 "claude-mem": {
                     "domain": "ai_tech",
-                    "sub_category": "ai_agents",
-                    "preferred_package": "ai_tech_ai_agents",
+                    "sub_category": "agent_memory",
+                    "preferred_package": "ai_agent_claude_mem",
                     "concept_offset": 10,
                     "demo_offset": 34,
                     "machine_name": "FIG 05 记忆回转柜",
@@ -369,8 +369,8 @@ class BilibiliVideoCrawler(BaseCrawler):
                 },
                 "free-claude-code": {
                     "domain": "ai_tech",
-                    "sub_category": "local_llm",
-                    "preferred_package": "ai_tech_local_llm",
+                    "sub_category": "coding_proxy",
+                    "preferred_package": "ai_tech_coding_proxy",
                     "concept_offset": 9,
                     "demo_offset": 36,
                     "machine_name": "FIG 06 免费模型路由器",

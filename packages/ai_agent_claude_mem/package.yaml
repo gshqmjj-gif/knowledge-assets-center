@@ -1,0 +1,50 @@
+id: ai_agent_claude_mem
+name: Claude-Mem 智能体跨对话长期记忆库
+description: 为 AI 编程与交互智能体赋予跨会话、跨生命周期的长期记忆与上下文精准语义召回
+domain: ai_tech
+domain_name: AI科技与大模型
+domain_icon: 🤖
+sub_category: agent_memory
+sub_category_name: 智能体长期记忆与上下文
+sub_category_icon: 💾
+tags:
+- AI科技与大模型
+- 智能体长期记忆与上下文
+- 知识资产
+created_at: '2026-10-29 03:00:53'
+updated_at: '2026-10-29 03:00:53'
+item_count: 1
+sources:
+- id: bilibili_video_20261027_claude-mem：给_AI_加上跨对话的长期记忆
+  title: claude-mem：给 AI 加上跨对话的长期记忆
+  type: bilibili_video
+  url: https://www.bilibili.com/video/BV1UAn36aEX3?t=278
+  author: 洛克AI
+  file: sources/20261027_bilibili_video_claude-mem：给_AI_加上跨对话的长期记忆.md
+  ingested_at: '2026-10-27 05:28:01'
+  keyframes_count: 2
+  snippets_count: 1
+  associated_entity: Claude
+  incremental_merged: false
+knowledge_matrix:
+- entity_name: Claude
+  domain: ai_tech
+  archetype: creative_multimodal
+  core_function: '核心解决痛点: 给 AI 加上跨对话的长期记忆；装上之后你的 AI 能多做什么: 给 AI 加上跨对话的长期记忆，显著突破传统工作流瓶颈。'
+  hardware_specs: '硬件要求: 轻量级无感常驻，内存占用 < 50MB / 运行环境: SQLite 3 + Python 3.9+ + Claude
+    Code CLI'
+  environment: '硬件要求: 轻量级无感常驻，内存占用 < 50MB + 运行环境: SQLite 3 + Python 3.9+ + Claude
+    Code CLI'
+  local_deployable: '本地化支持: 🟢 100% 本地数据库存储 (数据库保存在本地 .claude-mem，零数据上传第三方云端)'
+  competitive_advantages:
+  - 【跨会话零遗忘】无缝衔接多天甚至数周的长期研发任务，保留项目架构认知与个人编码风格。
+  - 【极低 Token 消耗】基于本地向量检索，仅在命中上下文时按需唤醒关键片段，不污染主窗口。
+  - 【透明可查可改】本地 SQLite 数据明文可查，支持开发者手动编辑或清洗记忆。
+  limitations_and_pitfalls:
+  - 【重大技术栈重构需清洗】当项目发生架构大重构时，建议清理旧技术栈先验，避免陈旧记忆干扰决策。
+  quickstart_commands:
+  - git clone https://github.com/thedotmack/claude-mem
+  key_insights: []
+  sources_contributed:
+  - 洛克AI
+  merged_sources_count: 1

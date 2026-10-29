@@ -1,6 +1,6 @@
 id: ai_tech_local_llm
-name: 端侧推理与极限显存优化 (AirLLM & FreeLLM)
-description: 4G显存跑大模型与本地免费编程代理网关
+name: 端侧推理与极限显存优化 (AirLLM 70B)
+description: 基于权重分层加载与量化，实现消费级单卡 4GB 显存运行 70B 大模型
 domain: ai_tech
 domain_name: AI科技与大模型
 domain_icon: 🤖
@@ -8,19 +8,24 @@ sub_category: local_llm
 sub_category_name: 本地大模型与端侧推理优化
 sub_category_icon: 🧠
 tags:
-- 洛克AI
-- 开源项目
 - AI科技与大模型
 - 本地大模型与端侧推理优化
-- ai_tech
-- free-claude-code
-- B站精选
-- AirLLM
 - 知识资产
-- local_llm
-created_at: '2026-10-27 05:28:02'
-updated_at: '2026-10-27 05:28:02'
-item_count: 2
+created_at: '2026-10-29 03:00:53'
+updated_at: '2026-10-29 03:00:53'
+item_count: 1
+sources:
+- id: bilibili_video_20261027_AirLLM：4GB_显卡跑_70B_大模型
+  title: AirLLM：4GB 显卡跑 70B 大模型
+  type: bilibili_video
+  url: https://www.bilibili.com/video/BV1UAn36aEX3?t=449
+  author: 洛克AI
+  file: sources/20261027_bilibili_video_AirLLM：4GB_显卡跑_70B_大模型.md
+  ingested_at: '2026-10-27 05:28:02'
+  keyframes_count: 2
+  snippets_count: 1
+  associated_entity: AirLLM：4GB 显卡跑 70B 大
+  incremental_merged: false
 knowledge_matrix:
 - entity_name: AirLLM：4GB 显卡跑 70B 大
   domain: ai_tech
@@ -43,48 +48,3 @@ knowledge_matrix:
   sources_contributed:
   - 洛克AI
   merged_sources_count: 1
-- entity_name: Ollama + Codex + Claude
-  domain: ai_tech
-  archetype: creative_multimodal
-  core_function: '核心解决痛点: 用免费额度跑 Claude Code 这类编程工具；装上之后你的 AI 能多做什么: 用免费额度跑 Claude
-    Code 这类编程工具，显著突破传统工作流瓶颈。'
-  hardware_specs: '硬件要求: 代理本身极度轻量；若运行本地大模型建议 8GB+ 显存 / 运行环境: Node.js 18+ 或 Python
-    3.10+ + Claude Code CLI'
-  environment: '硬件要求: 代理本身极度轻量；若运行本地大模型建议 8GB+ 显存 + 运行环境: Node.js 18+ 或 Python 3.10+
-    + Claude Code CLI'
-  local_deployable: '本地化支持: 🟡 本地网关服务 (网关运行于 127.0.0.1；若对接 Ollama 则全流程纯离线脱网)'
-  competitive_advantages:
-  - 【官方原生 CLI 体验】完美保留 Claude Code 优秀的交互体验与多工具调用生态。
-  - 【零账单成本开销】充分利用 Gemini 2.0 Flash 极高免费配额或 Groq 极速推理，免除昂贵 Token 费。
-  - 【热插拔多模型切换】可在云端免费模型与本地私有模型间秒级灵活切换。
-  limitations_and_pitfalls:
-  - 【非 Anthropic 官方出品】该项目为社区逆向协议桥接器，代码理解上限取决于后端选定的模型质量。
-  quickstart_commands:
-  - git clone https://github.com/Alishahryar1/free-claude-code
-  key_insights: []
-  sources_contributed:
-  - 洛克AI
-  merged_sources_count: 1
-sources:
-- id: bilibili_video_20261027_AirLLM：4GB_显卡跑_70B_大模型
-  title: AirLLM：4GB 显卡跑 70B 大模型
-  type: bilibili_video
-  url: https://www.bilibili.com/video/BV1UAn36aEX3?t=449
-  author: 洛克AI
-  file: sources/20261027_bilibili_video_AirLLM：4GB_显卡跑_70B_大模型.md
-  ingested_at: '2026-10-27 05:28:02'
-  keyframes_count: 2
-  snippets_count: 1
-  associated_entity: AirLLM：4GB 显卡跑 70B 大
-  incremental_merged: false
-- id: bilibili_video_20261027_free-claude-code：用免费额度跑_Claude_Code_这类编程工具
-  title: free-claude-code：用免费额度跑 Claude Code 这类编程工具
-  type: bilibili_video
-  url: https://www.bilibili.com/video/BV1UAn36aEX3?t=329
-  author: 洛克AI
-  file: sources/20261027_bilibili_video_free-claude-code：用免费额度跑_Claude_Code_这类编程工具.md
-  ingested_at: '2026-10-27 05:28:01'
-  keyframes_count: 2
-  snippets_count: 1
-  associated_entity: Ollama + Codex + Claude
-  incremental_merged: false
