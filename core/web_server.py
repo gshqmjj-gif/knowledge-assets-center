@@ -38,6 +38,23 @@ dispatcher = CrawlerDispatcher()
 # 静态资源挂载 (查看关键帧与架构图)
 app.mount("/packages", StaticFiles(directory=str(PACKAGES_DIR)), name="packages")
 
+# 兼容 Markdown 内部相对路径请求降级路由
+@app.get("/keyframes/{file_path:path}")
+def get_keyframe_fallback(file_path: str):
+    from fastapi.responses import FileResponse
+    for kf_file in PACKAGES_DIR.glob(f"*/keyframes/{file_path}"):
+        if kf_file.is_file():
+            return FileResponse(kf_file)
+    raise HTTPException(status_code=404, detail="Keyframe not found")
+
+@app.get("/assets/{file_path:path}")
+def get_asset_fallback(file_path: str):
+    from fastapi.responses import FileResponse
+    for asset_file in PACKAGES_DIR.glob(f"*/assets/{file_path}"):
+        if asset_file.is_file():
+            return FileResponse(asset_file)
+    raise HTTPException(status_code=404, detail="Asset not found")
+
 class IngestRequest(BaseModel):
     url: str
     package: Optional[str] = None
@@ -1008,7 +1025,7 @@ HTML_DASHBOARD = r"""
               <i class="fa-solid fa-file-waveform text-purple-400"></i> 资产包聚合体系大纲 (SUMMARY.md 渲染预览)
             </h4>
             <div class="bg-gray-900/90 border border-gray-800 p-4 rounded-xl text-xs text-gray-300 max-h-80 overflow-y-auto leading-relaxed prose-clean">
-              ${marked.parse(data.summary)}
+              ${marked.parse((data.summary || '').replace(/\(keyframes\//g, `(/packages/${data.id}/keyframes/`).replace(/\(assets\//g, `(/packages/${data.id}/assets/`))}
             </div>
           </div>
         `;
