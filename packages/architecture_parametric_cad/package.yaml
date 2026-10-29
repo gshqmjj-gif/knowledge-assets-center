@@ -1,0 +1,56 @@
+id: architecture_parametric_cad
+name: 自然语言参数化工业CAD (Text-to-CAD)
+description: 一句话生成工业级可加工3D实体与尺寸工程图
+domain: architecture
+domain_name: 建筑设计与空间计算
+domain_icon: 🏛️
+sub_category: parametric_design
+sub_category_name: 参数化算法与工业CAD
+sub_category_icon: 📐
+tags:
+- parametric_design
+- 洛克AI
+- 开源项目
+- architecture
+- B站精选
+- text-to-cad
+- 建筑设计与空间计算
+- 参数化算法与工业CAD
+- 知识资产
+created_at: '2026-10-27 05:28:02'
+updated_at: '2026-10-27 05:28:02'
+item_count: 1
+knowledge_matrix:
+- entity_name: text-to-cad：一句话生成能加工
+  domain: architecture
+  archetype: architecture_design
+  core_function: '核心解决痛点: 一句话生成能加工的 3D 零件；装上之后你的 AI 能多做什么: 一句话生成能加工的 3D 零件，显著突破传统工作流瓶颈。'
+  hardware_specs: '硬件要求: 普通工作站或轻薄本即可无痛运行 / 运行环境: Python 3.9+ + OpenSCAD / FreeCAD
+    CLI 工业引擎'
+  environment: '硬件要求: 普通工作站或轻薄本即可无痛运行 + 运行环境: Python 3.9+ + OpenSCAD / FreeCAD CLI
+    工业引擎'
+  local_deployable: '本地化支持: 🟢 100% 本地生成与导出标准工业文件 (离线即用，完全保护商业工业构件机密)'
+  competitive_advantages:
+  - 【工业级可用格式】直接输出标准 STEP / STL / 3MF，而非不可加工的游戏低模网格。
+  - 【可制造性检查】自动验证壁厚、装配干涉与切削物理可行性，并自动出具带尺寸的工程图。
+  - 【打样闭环】支持直接连通 3D 打印、钣金冲压与 CNC 代工服务一键打样下单。
+  limitations_and_pitfalls:
+  - 【复杂曲面边界】当前最擅长规则机械零件与参数化装配体；极度复杂的自由流体有机曲面仍需手工建模配合。
+  quickstart_commands:
+  - git clone https://github.com/earthtojake/text-to-cad
+  key_insights: []
+  sources_contributed:
+  - 洛克AI
+  merged_sources_count: 1
+sources:
+- id: bilibili_video_20261027_text-to-cad：一句话生成能加工的_3D_零件
+  title: text-to-cad：一句话生成能加工的 3D 零件
+  type: bilibili_video
+  url: https://www.bilibili.com/video/BV1UAn36aEX3?t=513
+  author: 洛克AI
+  file: sources/20261027_bilibili_video_text-to-cad：一句话生成能加工的_3D_零件.md
+  ingested_at: '2026-10-27 05:28:02'
+  keyframes_count: 2
+  snippets_count: 1
+  associated_entity: text-to-cad：一句话生成能加工
+  incremental_merged: false
