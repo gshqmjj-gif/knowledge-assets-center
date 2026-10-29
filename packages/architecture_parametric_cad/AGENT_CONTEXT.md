@@ -13,12 +13,12 @@
 - **Strict Pitfalls & Gotchas**: 【复杂曲面边界】当前最擅长规则机械零件与参数化装配体；极度复杂的自由流体有机曲面仍需手工建模配合。
 
 ### Target Entity: XPlant2.0
-- **Purpose**: 围绕 XPlant2.0 打造的全自动化逻辑推演与工程实现工作流
-- **Hardware Constraints**: 标准机器配置 (8G 内存即可无痛运行)
-- **Runtime Environment**: 跨平台标准环境 (支持 macOS / Linux / Windows)
-- **Deployment**: 🟢 本地命令行/独立工具 (无强联网依赖)
-- **Verified Advantages**: 【成熟生态】工具链模块解耦度高，支持快速组合并无缝嵌入现有工程流。; 【透明推演】输出具备完整的上下文依据与调用日志，结论可二次逐项核对。; 【能力突破】针对特定业务痛点提供显著效率提升与流程优化。; 【端到端协同】从目标分析、环境依赖配齐到成果交付，构建一体化工作流。
-- **Strict Pitfalls & Gotchas**: 【合规红线】严格限定合法学习或授权复刻，遵守开源许可与数据安全规范。; 【环境排错】涉及多工具串联，遇到报错应保留完整日志并逐项单点排查，切忌全量同时修改。; 【复刻边界】切忌盲目原样搬运；核心在于摸清行为逻辑后独立自研重写。; 【安全界限】自动化工具仅提供初步分析，复杂业务逻辑与生产环境仍需人工专项复核。
+- **Purpose**: 面向山地景观规划与参数化种植设计的 Rhino／Grasshopper 工具平台，将地形分析、现状评价、专项设计和成果输出整合为可连接、可复用的组件体系。
+- **Hardware Constraints**: 常规设计工作站 (建议 16G 内存 + 独立显卡)
+- **Runtime Environment**: Rhino / Grasshopper 平台 + 空间分析/GIS 插件组件
+- **Deployment**: 🟢 纯本地离线运行 (基于本地 Rhino/Grasshopper 本地计算与离线 Mesh 分析)
+- **Verified Advantages**: 【多模态空间数据输入】支持测绘高程点、等高线、地形 Mesh、土地利用及外部模型数据，建立从空间分析到方案生成完整流程。; 【全专项功能组件覆盖】覆盖总体规划、山地植物设计、生态修复、海绵雨洪、水库堰塞湖安全、道路游线、建筑设施选址、边坡地质安全、土方竖向等。; 【设计依据量化可追溯】把复杂地形转化为量化分析结果，直接驱动分区、选址、路径组织和种植配置，支持多方案迭代。
+- **Strict Pitfalls & Gotchas**: 【当前版本边界】当前处于 DEMO 版本阶段，仍处于持续演进与功能完善中。; 【工程安全规划筛查】工程安全类工具主要服务于规划阶段筛查，专业深入设计需衔接专业工程力学模型验证。
 
 ## Project Constraints & Directives for Agent:
 1. You are operating as an expert specialist in 自然语言参数化工业CAD (Text-to-CAD).

@@ -46,37 +46,35 @@ knowledge_matrix:
 - entity_name: XPlant2.0
   domain: architecture
   archetype: architecture_design
-  core_function: 围绕 XPlant2.0 打造的全自动化逻辑推演与工程实现工作流
-  hardware_specs: 标准机器配置 (8G 内存即可无痛运行)
-  environment: 跨平台标准环境 (支持 macOS / Linux / Windows)
-  local_deployable: 🟢 本地命令行/独立工具 (无强联网依赖)
+  core_function: 面向山地景观规划与参数化种植设计的 Rhino／Grasshopper 工具平台，将地形分析、现状评价、专项设计和成果输出整合为可连接、可复用的组件体系。
+  hardware_specs: 常规设计工作站 (建议 16G 内存 + 独立显卡)
+  environment: Rhino / Grasshopper 平台 + 空间分析/GIS 插件组件
+  local_deployable: 🟢 纯本地离线运行 (基于本地 Rhino/Grasshopper 本地计算与离线 Mesh 分析)
   competitive_advantages:
-  - 【成熟生态】工具链模块解耦度高，支持快速组合并无缝嵌入现有工程流。
-  - 【透明推演】输出具备完整的上下文依据与调用日志，结论可二次逐项核对。
-  - 【能力突破】针对特定业务痛点提供显著效率提升与流程优化。
-  - 【端到端协同】从目标分析、环境依赖配齐到成果交付，构建一体化工作流。
+  - 【多模态空间数据输入】支持测绘高程点、等高线、地形 Mesh、土地利用及外部模型数据，建立从空间分析到方案生成完整流程。
+  - 【全专项功能组件覆盖】覆盖总体规划、山地植物设计、生态修复、海绵雨洪、水库堰塞湖安全、道路游线、建筑设施选址、边坡地质安全、土方竖向等。
+  - 【设计依据量化可追溯】把复杂地形转化为量化分析结果，直接驱动分区、选址、路径组织和种植配置，支持多方案迭代。
   limitations_and_pitfalls:
-  - 【合规红线】严格限定合法学习或授权复刻，遵守开源许可与数据安全规范。
-  - 【环境排错】涉及多工具串联，遇到报错应保留完整日志并逐项单点排查，切忌全量同时修改。
-  - 【复刻边界】切忌盲目原样搬运；核心在于摸清行为逻辑后独立自研重写。
-  - 【安全界限】自动化工具仅提供初步分析，复杂业务逻辑与生产环境仍需人工专项复核。
+  - 【当前版本边界】当前处于 DEMO 版本阶段，仍处于持续演进与功能完善中。
+  - 【工程安全规划筛查】工程安全类工具主要服务于规划阶段筛查，专业深入设计需衔接专业工程力学模型验证。
   quickstart_commands: []
   key_insights: []
   sources_contributed:
-  - XPlant2.0
+  - 数图魔方
   merged_sources_count: 1
 sources:
 - id: wechat_article_20261029_XPlant2.0
   title: XPlant2.0
   type: wechat_article
   url: https://mp.weixin.qq.com/s/azWKal9TNsvoXm6RqXyaLw
-  author: ''
+  author: 数图魔方
   file: sources/20261029_wechat_article_XPlant2.0.md
   ingested_at: '2026-10-29 03:13:04'
   keyframes_count: 0
   snippets_count: 0
   associated_entity: XPlant2.0
   incremental_merged: false
+  assets_count: 20
 - id: bilibili_video_20261027_text-to-cad：一句话生成能加工的_3D_零件
   title: text-to-cad：一句话生成能加工的 3D 零件
   type: bilibili_video

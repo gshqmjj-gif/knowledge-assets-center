@@ -63,6 +63,18 @@ class WeChatArticleCrawler(BaseCrawler):
             meta_author = soup.find("meta", property="og:article:author")
             if meta_author and meta_author.get("content"):
                 author = meta_author["content"].strip()
+        if not author:
+            for pat in [
+                r"tag_name:\s*'([^']+)'",
+                r"nickname:\s*'([^']+)'",
+                r'd\.nickname\s*=\s*[\'"]([^\'"]+)[\'"]',
+                r'window\.nickname\s*=\s*[\'"]([^\'"]+)[\'"]',
+                r"var\s+nickname\s*=\s*[\"']([^\"']+)[\"']"
+            ]:
+                m = re.search(pat, html_text)
+                if m and m.group(1).strip() and m.group(1).strip() != title:
+                    author = m.group(1).strip()
+                    break
 
         # 3. 提取发布时间
         published_date = ""
@@ -170,12 +182,97 @@ class WeChatArticleCrawler(BaseCrawler):
         if not content_markdown and content_div:
             content_markdown = content_div.get_text(separator="\n\n", strip=True)
 
+        # 针对微信“小绿书”/轮播图文分享消息进行深度解析（无 js_content 或正文极少）
+        if not content_markdown or len(content_markdown) < 50:
+            desc_text = ""
+            og_desc = soup.find("meta", property="og:description") or soup.find("meta", attrs={"name": "description"})
+            if og_desc and og_desc.get("content"):
+                desc_text = og_desc["content"].strip().replace(r"\x0a", "\n").replace("\r\n", "\n")
+
+            # 提取小绿书/轮播高清图 (过滤头像与水印)
+            slide_matches = re.findall(r"\{\s*cdn_url:\s*['\"]([^'\"]+)['\"]\s*,\s*width:\s*['\"]?(\d+)['\"]?", html_text)
+            slide_urls = []
+            for u, w in slide_matches:
+                u_clean = u.replace(r"\x26amp;", "&").replace("&amp;", "&")
+                if u_clean not in slide_urls and "watermark" not in u_clean:
+                    slide_urls.append(u_clean)
+
+            if not slide_urls:
+                p_block = re.search(r"picture_page_info_list:\s*(\[.*?\])\s*,\s*(?:share_cover|wxa_info)", html_text, re.DOTALL)
+                if p_block:
+                    raw_u = re.findall(r"cdn_url:\s*['\"]([^'\"]+)['\"]", p_block.group(1))
+                    for ru in raw_u:
+                        ru_clean = ru.replace(r"\x26amp;", "&").replace("&amp;", "&")
+                        if "watermark" not in ru_clean and ru_clean not in slide_urls:
+                            slide_urls.append(ru_clean)
+
+            if desc_text or slide_urls:
+                slider_lines = []
+                slider_lines.append(f"# {title}\n\n")
+                meta_info = []
+                if author:
+                    meta_info.append(f"**作者/专栏**：{author}")
+                if published_date:
+                    meta_info.append(f"**发布时间**：{published_date}")
+                meta_info.append(f"**原文链接**：[{url}]({url})")
+                slider_lines.append(f"> {' | '.join(meta_info)}\n\n")
+
+                if desc_text:
+                    slider_lines.append("## 📌 核心知识纲要与功能体系\n\n")
+                    for para in desc_text.split("\n"):
+                        para = para.strip()
+                        if para:
+                            slider_lines.append(f"{para}\n\n")
+                            if len(para) > 15 and len(key_points) < 8:
+                                key_points.append(para[:60] + ("..." if len(para) > 60 else ""))
+
+                if slide_urls:
+                    slider_lines.append(f"## 🖼️ 图文解说与高清幻灯片画廊 (共 {len(slide_urls)} 张高清原图)\n\n")
+                    img_headers = {
+                        "User-Agent": DEFAULT_USER_AGENT,
+                        "Referer": "https://mp.weixin.qq.com/",
+                        "Accept": "image/avif,image/webp,image/apng,image/*,*/*;q=0.8"
+                    }
+                    with httpx.Client(headers=img_headers, timeout=15.0) as img_client:
+                        for s_idx, s_url in enumerate(slide_urls):
+                            img_counter += 1
+                            safe_slug = re.sub(r'[^a-zA-Z0-9]', '_', title)[:20].strip('_')
+                            ext = "png"
+                            if "wx_fmt=jpeg" in s_url or "wx_fmt=jpg" in s_url:
+                                ext = "jpg"
+                            local_filename = f"wechat_{safe_slug}_{img_counter:02d}.{ext}"
+                            local_img_path = dest_assets_dir / local_filename
+
+                            downloaded = False
+                            if not local_img_path.exists():
+                                try:
+                                    r_img = img_client.get(s_url)
+                                    if r_img.status_code == 200 and len(r_img.content) > 1000:
+                                        with open(local_img_path, "wb") as f_img:
+                                            f_img.write(r_img.content)
+                                        downloaded = True
+                                except Exception as e:
+                                    logger.warning(f"Failed to fetch slider image {s_idx+1}: {e}")
+                            else:
+                                downloaded = True
+
+                            if downloaded and local_img_path.exists():
+                                images.append(str(local_img_path))
+                                slider_lines.append(f"![幻灯片 #{s_idx+1}](assets/{local_filename})\n\n")
+                            else:
+                                slider_lines.append(f"![幻灯片 #{s_idx+1}]({s_url})\n\n")
+
+                content_markdown = "".join(slider_lines).strip()
+
         # 5. 自动提取标签与生成简述
         tags = ["微信公众号"]
         if author:
             tags.append(author)
-        for kw in ["架构", "AI", "Agent", "Python", "前端", "爬虫", "Blender", "工作流", "全栈"]:
-            if kw.lower() in title.lower() or kw.lower() in content_markdown[:1000].lower():
+        for kw in [
+            "架构", "AI", "Agent", "Python", "前端", "爬虫", "Blender", "工作流", "全栈",
+            "Rhino", "Grasshopper", "CAD", "参数化", "景观", "规划", "种植设计", "数字人", "GIS"
+        ]:
+            if kw.lower() in title.lower() or kw.lower() in content_markdown[:2000].lower():
                 tags.append(kw)
 
         # 提炼摘要 (前300字或关键句)
@@ -196,7 +293,7 @@ class WeChatArticleCrawler(BaseCrawler):
             key_points=key_points[:8],
             tags=list(set(tags)),
             code_snippets=code_snippets,
-            assets=images[:10],
+            assets=images[:40],
             metadata={
                 "crawler": "WeChatArticleCrawler",
                 "images_count": len(images),

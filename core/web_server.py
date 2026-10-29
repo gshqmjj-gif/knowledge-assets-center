@@ -1536,7 +1536,7 @@ HTML_DASHBOARD = r"""
         // 为所有图片增加防盗链与懒加载属性
         parsedHtml = parsedHtml.replace(/<img /g, '<img referrerpolicy="no-referrer" loading="lazy" ');
 
-        modalBody.innerHTML = topVideoHtml + fmHtml + `<div class="prose-clean">${parsedHtml}</div>`;
+        modalBody.innerHTML = topVideoHtml + fmHtml + (content.trim() ? `<div class="prose-clean">${parsedHtml}</div>` : `<div class="p-6 text-center text-gray-400 bg-gray-950/60 rounded-xl border border-gray-800"><i class="fa-solid fa-file-circle-exclamation text-yellow-500 text-xl mb-2 block"></i>当前资料暂无正文内容，已保留上方元数据与来源链接。</div>`);
       } catch (e) {
         modalBody.innerHTML = `<div class="text-rose-400 p-4">加载本地脱机文件失败: ${e.message}</div>`;
       }
