@@ -1,0 +1,14 @@
+new_topic:
+  name: AI制图
+  icon: 💡
+  aliases:
+  - AI制图
+  - new_topic
+  sub_categories:
+    new_topic_practices:
+      name: 可视化设计
+      icon: 📌
+      keywords:
+      - 可视化设计
+      - ai制图
+      - new_topic_practices
