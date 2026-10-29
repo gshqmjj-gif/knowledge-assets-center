@@ -345,6 +345,20 @@ class KnowledgePackageManager:
                         snip_dest.parent.mkdir(parents=True, exist_ok=True)
                         shutil.copy2(str(snip_src), str(snip_dest))
 
+        # 迁移对应的知识特征卡片 (knowledge_matrix)
+        entity_name = target_source.get("associated_entity")
+        if entity_name:
+            from_matrix = from_meta.get("knowledge_matrix", [])
+            other_uses = any(s.get("associated_entity") == entity_name for s in new_from_sources)
+            card_to_move = next((m for m in from_matrix if m.get("entity_name") == entity_name), None)
+            if card_to_move and not other_uses:
+                from_meta["knowledge_matrix"] = [m for m in from_matrix if m.get("entity_name") != entity_name]
+            if card_to_move:
+                to_matrix = to_meta.get("knowledge_matrix", [])
+                if not any(m.get("entity_name") == entity_name for m in to_matrix):
+                    to_matrix.append(card_to_move)
+                to_meta["knowledge_matrix"] = to_matrix
+
         # 更新双方 package.yaml
         from_meta["sources"] = new_from_sources
         from_meta["item_count"] = len(new_from_sources)
@@ -366,6 +380,182 @@ class KnowledgePackageManager:
         self.synthesize_package(to_package_id)
         logger.info(f"Moved source {source_filename} from {from_package_id} to {to_package_id}.")
         return True
+
+    def split_source_to_package(
+        self,
+        source_package_id: str,
+        source_filename: str,
+        new_package_name: str,
+        new_description: Optional[str] = None,
+        target_domain: Optional[str] = None,
+        target_sub_category: Optional[str] = None
+    ) -> Optional[str]:
+        """
+        三级内容独立拆分：将某篇文献资料从原资产包中剥离，独立建立为全新的知识资产包（独立子项目）
+        彻底避免不同工具/项目被无脑合并成一个资产包的问题
+        """
+        clean_name = new_package_name.strip()
+        if not clean_name:
+            return None
+
+        from_dir = self.packages_dir / source_package_id
+        if not from_dir.exists():
+            return None
+
+        with open(from_dir / "package.yaml", "r", encoding="utf-8") as f:
+            from_meta = yaml.safe_load(f) or {}
+
+        dom_key = target_domain or from_meta.get("domain", "inbox")
+        sub_id = target_sub_category or from_meta.get("sub_category", "quick_capture")
+
+        # 生成新的资产包 ID
+        slug = re.sub(r'[^a-zA-Z0-9_]', '_', clean_name).strip('_').lower()
+        if not slug:
+            slug = "subproject"
+        new_pkg_id = f"{dom_key}_{slug}"[:36].rstrip('_')
+        if (self.packages_dir / new_pkg_id).exists():
+            new_pkg_id = f"{new_pkg_id}_{datetime.now().strftime('%m%d_%H%M%S')}"
+
+        dom_info = PRIMARY_DOMAINS.get(dom_key, PRIMARY_DOMAINS.get("inbox", {}))
+        dom_name = dom_info.get("name", dom_key)
+        sub_info = dom_info.get("sub_categories", {}).get(sub_id, {})
+        sub_name = sub_info.get("name", sub_id)
+
+        desc = new_description.strip() if new_description else f"{dom_name} > {sub_name} 独立子项目知识资产"
+
+        self.create_package(
+            package_id=new_pkg_id,
+            name=clean_name,
+            description=desc,
+            domain=dom_key,
+            sub_category=sub_id,
+            tags=[dom_name, sub_name, clean_name]
+        )
+
+        success = self.move_source(source_package_id, new_pkg_id, source_filename)
+        if not success:
+            return None
+
+        logger.info(f"Split source {source_filename} from {source_package_id} to new package {new_pkg_id} ('{clean_name}')")
+        return new_pkg_id
+
+    def promote_package_to_subcategory(
+        self,
+        package_id: str,
+        new_sub_name: str,
+        new_sub_icon: str = "📌",
+        target_domain: Optional[str] = None
+    ) -> Optional[Tuple[str, str]]:
+        """
+        三级内容升级为二级分类：将一个知识资产包（子项目）提升为该一级领域下的全新二级子板块
+        并在 custom_domains.yaml 中持久化注册，让分类体系随业务灵活成长
+        """
+        clean_sub_name = new_sub_name.strip()
+        if not clean_sub_name:
+            return None
+
+        pkg_dir = self.packages_dir / package_id
+        if not pkg_dir.exists():
+            return None
+
+        with open(pkg_dir / "package.yaml", "r", encoding="utf-8") as f:
+            meta = yaml.safe_load(f) or {}
+
+        dom_key = target_domain or meta.get("domain", "inbox")
+        dom_info = PRIMARY_DOMAINS.get(dom_key, PRIMARY_DOMAINS.get("inbox", {}))
+        dom_name = dom_info.get("name", dom_key)
+        dom_icon = dom_info.get("icon", "📁")
+
+        # 生成合法的 sub_key
+        sub_slug = re.sub(r'[^a-zA-Z0-9_]', '_', clean_sub_name).strip('_').lower()
+        if not sub_slug or len(sub_slug) < 2:
+            sub_slug = f"sub_{datetime.now().strftime('%m%d_%H%M%S')}"
+        sub_key = sub_slug[:24]
+
+        # 持久化注册新二级板块
+        save_custom_domain(
+            domain_key=dom_key,
+            domain_name=dom_name,
+            domain_icon=dom_icon,
+            sub_key=sub_key,
+            sub_name=clean_sub_name,
+            sub_icon=new_sub_icon or "📌",
+            keywords=[clean_sub_name.lower(), dom_name.lower(), sub_key.lower()]
+        )
+
+        # 调整该资产包归属到新创建的二级子板块
+        self.move_package(package_id, dom_key, sub_key)
+        logger.info(f"Promoted package {package_id} to new subcategory [{dom_name} > {clean_sub_name} ({sub_key})]")
+        return dom_key, sub_key
+
+    def _find_matching_package_in_sub_category(self, domain_key: str, sub_id: str, item: IngestedItem, search_blob: str) -> Optional[str]:
+        """
+        在指定的二级子类别中，按专属工具/项目实体严格查找匹配的资产包：
+        只有当新资料确实是关于该已有工具（如 OpenMontage 后续教程）时才合入；
+        若属于完全不同的独立工具（如 WorkBuddy vs OpenMontage），则返回 None，由系统创建全新独立包！
+        """
+        item_title_lower = item.title.lower()
+        item_tags_lower = [t.lower() for t in item.tags]
+
+        for pkg in self.list_packages():
+            if pkg.get("domain") == domain_key and pkg.get("sub_category") == sub_id:
+                pkg_name = pkg.get("name", "").lower()
+                pkg_id = pkg.get("id", "").lower()
+                pkg_tags = [t.lower() for t in pkg.get("tags", [])]
+                matrix_entities = [m.get("entity_name", "").lower() for m in pkg.get("knowledge_matrix", [])]
+
+                # 提取包的专属项目标识关键词
+                # 例如从 "OpenMontage AI视频代码剪辑工坊" 提取 "openmontage"
+                candidates = set()
+                candidates.add(pkg_id.replace(f"{domain_key}_", ""))
+                for part in re.split(r'[\s\-_+（）()]+', pkg_name):
+                    if len(part) >= 3 and not any(common in part for common in ["ai", "视频", "工坊", "助手", "工作流", "知识", "资产包"]):
+                        candidates.add(part)
+                for ent in matrix_entities:
+                    if len(ent) >= 3:
+                        candidates.add(ent)
+
+                for cand in candidates:
+                    if cand and len(cand) >= 3:
+                        if cand in item_title_lower or any(cand in t for t in item_tags_lower):
+                            return pkg.get("id")
+
+        return None
+
+    def _create_independent_package_for_item(self, domain_key: str, sub_id: str, item: IngestedItem) -> str:
+        """
+        为二级类别下的独立新项目自动创建专属的独立资产包（标签）：
+        智能从标题提炼独立项目名，彻底避免粗暴多项目名拼接
+        """
+        dom_info = PRIMARY_DOMAINS.get(domain_key, PRIMARY_DOMAINS["inbox"])
+        sub_name = dom_info.get("sub_categories", {}).get(sub_id, {}).get("name", sub_id)
+
+        # 提炼项目主体名称
+        title_clean = item.title.strip()
+        # 移除如 "用"、"把"、"附教程"、"史诗级更新" 等常见营销前缀后缀
+        title_clean = re.sub(r'^(用|把|基于|让)\s*', '', title_clean)
+        extracted = re.split(r'[：:—\-|，,]|（|\(|附教程|史诗级', title_clean)[0].strip()
+        if len(extracted) < 2 or len(extracted) > 28:
+            extracted = title_clean[:20].strip()
+
+        # 生成干净 slug
+        slug = re.sub(r'[^a-zA-Z0-9_]', '_', item.slug()[:20]).strip('_').lower()
+        if not slug:
+            slug = f"project_{datetime.now().strftime('%m%d%H%M')}"
+        new_pkg_id = f"{domain_key}_{slug}"
+        if (self.packages_dir / new_pkg_id).exists():
+            new_pkg_id = f"{new_pkg_id}_{datetime.now().strftime('%H%M%S')}"
+
+        pkg_display_name = f"{extracted}"
+        self.create_package(
+            package_id=new_pkg_id,
+            name=pkg_display_name,
+            description=item.summary or f"{dom_info['name']} > {sub_name} 独立子项目知识资产",
+            domain=domain_key,
+            sub_category=sub_id,
+            tags=[dom_info['name'], sub_name, extracted] + item.tags[:3]
+        )
+        return new_pkg_id
 
     def route_item_to_package(
         self,
@@ -408,25 +598,13 @@ class KnowledgePackageManager:
             if not sub_id:
                 sub_id, sub_name = resolve_sub_category(domain_key, search_blob)
             
-            # 优先复用该子方向已有资产包
-            for pkg in self.list_packages():
-                if pkg.get("domain") == domain_key and pkg.get("sub_category") == sub_id:
-                    return pkg.get("id")
+            # 检查在当前子类别下，是否有强匹配相同实体/项目的已有资产包
+            matched_pkg_id = self._find_matching_package_in_sub_category(domain_key, sub_id, item, search_blob)
+            if matched_pkg_id:
+                return matched_pkg_id
 
-            # 若无，自动创建该子方向的专属资产包
-            dom_info = PRIMARY_DOMAINS.get(domain_key, PRIMARY_DOMAINS["inbox"])
-            sub_name = dom_info.get("sub_categories", {}).get(sub_id, {}).get("name", sub_id)
-            new_pkg_id = f"{domain_key}_{sub_id}"
-            if not (self.packages_dir / new_pkg_id).exists():
-                self.create_package(
-                    package_id=new_pkg_id,
-                    name=f"{sub_name}知识资产包",
-                    description=f"{dom_info['name']} > {sub_name} 专题领域沉淀",
-                    domain=domain_key,
-                    sub_category=sub_id,
-                    tags=[dom_info['name'], sub_name]
-                )
-            return new_pkg_id
+            # 若属于该子类别下的新独立项目/工具，创建专属独立资产包（标签）
+            return self._create_independent_package_for_item(domain_key, sub_id, item)
 
         # 3. 智能语义加权匹配：先精准识别所属子方向与一级领域
         best_domain_key = None
@@ -454,25 +632,13 @@ class KnowledgePackageManager:
 
         # 若命中特定子方向 (得分 >= 3)
         if best_domain_key and best_sub_id and highest_score >= 3:
-            # 优先寻找该子方向已有资产包
-            for pkg in self.list_packages():
-                if pkg.get("domain") == best_domain_key and pkg.get("sub_category") == best_sub_id:
-                    return pkg.get("id")
+            # 检查在当前子类别下，是否有强匹配相同实体/项目的已有资产包
+            matched_pkg_id = self._find_matching_package_in_sub_category(best_domain_key, best_sub_id, item, search_blob)
+            if matched_pkg_id:
+                return matched_pkg_id
 
-            # 否则创建专属资产包
-            dom_info = PRIMARY_DOMAINS.get(best_domain_key, PRIMARY_DOMAINS["inbox"])
-            sub_name = dom_info.get("sub_categories", {}).get(best_sub_id, {}).get("name", best_sub_id)
-            new_pkg_id = f"{best_domain_key}_{best_sub_id}"
-            if not (self.packages_dir / new_pkg_id).exists():
-                self.create_package(
-                    package_id=new_pkg_id,
-                    name=f"{sub_name}知识资产包",
-                    description=f"{dom_info['name']} > {sub_name} 专题领域知识沉淀",
-                    domain=best_domain_key,
-                    sub_category=best_sub_id,
-                    tags=[dom_info['name'], sub_name]
-                )
-            return new_pkg_id
+            # 若属于该子方向的新独立项目/工具，创建专属独立资产包（标签）
+            return self._create_independent_package_for_item(best_domain_key, best_sub_id, item)
 
         # 4. 兜底通用收件箱
         fallback_id = "inbox_quick_capture"

@@ -94,6 +94,24 @@ class RenameCategoryRequest(BaseModel):
     new_name: str
     new_icon: Optional[str] = None
 
+class CreatePackageRequest(BaseModel):
+    name: str
+    description: Optional[str] = ""
+    domain: str
+    sub_category: str
+
+class SplitSourcePackageRequest(BaseModel):
+    file: str
+    new_name: str
+    new_description: Optional[str] = None
+    domain: Optional[str] = None
+    sub_category: Optional[str] = None
+
+class PromotePackageRequest(BaseModel):
+    new_sub_name: str
+    new_sub_icon: Optional[str] = "📌"
+    domain_key: Optional[str] = None
+
 @app.get("/api/taxonomy")
 def get_taxonomy():
     pkgs = pm.list_packages()
@@ -203,6 +221,62 @@ def rename_category_api(req: RenameCategoryRequest):
 
     git_mgr.commit(f"feat(kb): rename category [{req.domain_key}/{req.sub_key or ''}] to '{req.new_name}'")
     return {"success": True, "message": f"分类板块已重命名为 {req.new_name}"}
+
+@app.post("/api/packages/create")
+def create_package_api(req: CreatePackageRequest):
+    clean_slug = re.sub(r'[^a-zA-Z0-9_]', '_', req.name).strip('_').lower()
+    if not clean_slug:
+        clean_slug = "subproject"
+    pkg_id = f"{req.domain}_{clean_slug}"[:36].rstrip('_')
+    if (PACKAGES_DIR / pkg_id).exists():
+        pkg_id = f"{pkg_id}_{datetime.now().strftime('%m%d_%H%M%S')}"
+
+    dom_info = PRIMARY_DOMAINS.get(req.domain, PRIMARY_DOMAINS.get("inbox", {}))
+    dom_name = dom_info.get("name", req.domain)
+    sub_info = dom_info.get("sub_categories", {}).get(req.sub_category, {})
+    sub_name = sub_info.get("name", req.sub_category)
+
+    desc = req.description.strip() if req.description else f"{dom_name} > {sub_name} 独立子项目知识资产"
+    pm.create_package(
+        package_id=pkg_id,
+        name=req.name.strip(),
+        description=desc,
+        domain=req.domain,
+        sub_category=req.sub_category,
+        tags=[dom_name, sub_name, req.name.strip()]
+    )
+    pm.synthesize_package(pkg_id)
+    git_mgr.commit(f"feat(kb): create package '{req.name.strip()}' ({pkg_id})")
+    return {"success": True, "package_id": pkg_id, "message": f"独立资产包「{req.name.strip()}」创建成功"}
+
+@app.post("/api/packages/{package_id}/sources/split_to_new")
+def split_source_to_package_api(package_id: str, req: SplitSourcePackageRequest):
+    new_pkg_id = pm.split_source_to_package(
+        source_package_id=package_id,
+        source_filename=req.file,
+        new_package_name=req.new_name,
+        new_description=req.new_description,
+        target_domain=req.domain,
+        target_sub_category=req.sub_category
+    )
+    if not new_pkg_id:
+        raise HTTPException(status_code=400, detail="Failed to split source to new package")
+    git_mgr.commit(f"feat(kb): split source '{req.file}' from '{package_id}' to new package '{new_pkg_id}' ('{req.new_name}')")
+    return {"success": True, "new_package_id": new_pkg_id, "message": f"已将资料成功拆解为独立子项目「{req.new_name}」！"}
+
+@app.post("/api/packages/{package_id}/promote_to_subcategory")
+def promote_package_api(package_id: str, req: PromotePackageRequest):
+    res = pm.promote_package_to_subcategory(
+        package_id=package_id,
+        new_sub_name=req.new_sub_name,
+        new_sub_icon=req.new_sub_icon or "📌",
+        target_domain=req.domain_key
+    )
+    if not res:
+        raise HTTPException(status_code=400, detail="Failed to promote package to subcategory")
+    dom_key, sub_key = res
+    git_mgr.commit(f"feat(kb): promote package '{package_id}' to subcategory '{req.new_sub_name}' in domain '{dom_key}'")
+    return {"success": True, "domain_key": dom_key, "sub_key": sub_key, "message": f"资产包已升级为二级子板块「{req.new_sub_name}」！"}
 
 @app.get("/api/search")
 def search_api(q: str):
@@ -577,7 +651,12 @@ HTML_DASHBOARD = r"""
             </h3>
             <span id="pkgListSubTitle" class="text-[10px] text-gray-400">包含 0 个资产包</span>
           </div>
-          <button onclick="loadPackages()" class="text-[11px] text-gray-400 hover:text-white"><i class="fa-solid fa-arrows-rotate"></i></button>
+          <div class="flex items-center gap-1.5">
+            <button onclick="openCreatePackageModal()" class="text-[10px] px-2 py-1 rounded bg-indigo-600/80 hover:bg-indigo-500 text-white font-medium flex items-center gap-1 transition" title="在此板块下新建独立资产包/子项目">
+              <i class="fa-solid fa-plus text-[9px]"></i> 新建项目
+            </button>
+            <button onclick="loadPackages()" class="text-[11px] text-gray-400 hover:text-white p-1 rounded hover:bg-gray-800 transition" title="刷新列表"><i class="fa-solid fa-arrows-rotate"></i></button>
+          </div>
         </div>
 
         <div class="flex-1 overflow-y-auto space-y-2 pr-1" id="packagesList">
@@ -883,6 +962,131 @@ HTML_DASHBOARD = r"""
     </div>
   </div>
 
+  <!-- Create Package Modal (新建独立子项目/知识资产包) -->
+  <div id="createPackageModal" class="fixed inset-0 bg-black/85 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-gray-900 border border-gray-700 w-full max-w-lg rounded-2xl flex flex-col shadow-2xl overflow-hidden">
+      <div class="flex justify-between items-center px-6 py-4 border-b border-gray-800 bg-gray-950/80">
+        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+          <i class="fa-solid fa-plus-circle text-indigo-400"></i> 新建独立子项目 / 资产包
+        </h3>
+        <button onclick="closeCreatePackageModal()" class="text-gray-400 hover:text-white p-1 rounded-lg">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div class="p-6 space-y-4">
+        <div>
+          <label class="block text-xs font-semibold text-gray-300 mb-1.5">子项目/资产包名称 <span class="text-rose-400">*</span>:</label>
+          <input type="text" id="createPkgNameInput" placeholder="例如：WorkBuddy AI视频制作工坊" class="w-full bg-gray-950 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-gray-300 mb-1.5">一句话定位阐述与简介:</label>
+          <textarea id="createPkgDescInput" rows="2" placeholder="简述该子项目的核心定位、解决的技术痛点或工程能力..." class="w-full bg-gray-950 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"></textarea>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-gray-300 mb-1.5">所属一级领域:</label>
+            <select id="createPkgDomainSelect" onchange="handleCreatePkgDomainChange()" class="w-full bg-gray-950 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"></select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-gray-300 mb-1.5">所属二级子类别:</label>
+            <select id="createPkgSubSelect" class="w-full bg-gray-950 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"></select>
+          </div>
+        </div>
+      </div>
+      <div class="px-6 py-3 border-t border-gray-800 bg-gray-950/90 flex justify-end gap-2">
+        <button onclick="closeCreatePackageModal()" class="px-4 py-1.5 rounded-lg text-xs text-gray-400 hover:text-white hover:bg-gray-800 transition">取消</button>
+        <button onclick="submitCreatePackage()" class="btn-gradient px-4 py-1.5 rounded-lg text-xs font-semibold text-white shadow transition">立即创建</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Split Source Modal (拆解文献为独立子项目/新资产包) -->
+  <div id="splitSourceModal" class="fixed inset-0 bg-black/85 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-gray-900 border border-gray-700 w-full max-w-lg rounded-2xl flex flex-col shadow-2xl overflow-hidden">
+      <div class="flex justify-between items-center px-6 py-4 border-b border-gray-800 bg-gray-950/80">
+        <div>
+          <h3 class="text-sm font-bold text-white flex items-center gap-2">
+            <i class="fa-solid fa-scissors text-emerald-400"></i> 拆解文献为独立子项目
+          </h3>
+          <p class="text-[11px] text-gray-400 mt-0.5">将三级文献从当前包剥离，单独升级为全新的知识资产标签</p>
+        </div>
+        <button onclick="closeSplitSourceModal()" class="text-gray-400 hover:text-white p-1 rounded-lg">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div class="p-6 space-y-4">
+        <input type="hidden" id="splitSourceFromPkgId" value="">
+        <input type="hidden" id="splitSourceFile" value="">
+        <div class="bg-black/40 p-3 rounded-xl border border-gray-800/80">
+          <span class="text-[11px] text-gray-400 block mb-1">正在剥离的文献:</span>
+          <span id="splitSourceCurrentTitleLabel" class="text-xs font-bold text-indigo-300"></span>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-gray-300 mb-1.5">新子项目/资产包名称 <span class="text-rose-400">*</span>:</label>
+          <input type="text" id="splitPkgNameInput" class="w-full bg-gray-950 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-gray-300 mb-1.5">定位阐述与简介:</label>
+          <textarea id="splitPkgDescInput" rows="2" class="w-full bg-gray-950 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"></textarea>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-gray-300 mb-1.5">归属一级领域:</label>
+            <select id="splitDomainSelect" onchange="handleSplitDomainChange()" class="w-full bg-gray-950 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"></select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-gray-300 mb-1.5">归属二级子类别:</label>
+            <select id="splitSubSelect" class="w-full bg-gray-950 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"></select>
+          </div>
+        </div>
+      </div>
+      <div class="px-6 py-3 border-t border-gray-800 bg-gray-950/90 flex justify-end gap-2">
+        <button onclick="closeSplitSourceModal()" class="px-4 py-1.5 rounded-lg text-xs text-gray-400 hover:text-white hover:bg-gray-800 transition">取消</button>
+        <button onclick="submitSplitSource()" class="btn-gradient px-4 py-1.5 rounded-lg text-xs font-semibold text-white shadow transition">确认独立拆解</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Promote Package Modal (升级资产包为二级子板块) -->
+  <div id="promotePackageModal" class="fixed inset-0 bg-black/85 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-gray-900 border border-gray-700 w-full max-w-md rounded-2xl flex flex-col shadow-2xl overflow-hidden">
+      <div class="flex justify-between items-center px-6 py-4 border-b border-gray-800 bg-gray-950/80">
+        <div>
+          <h3 class="text-sm font-bold text-white flex items-center gap-2">
+            <i class="fa-solid fa-star text-amber-400"></i> 提升为二级子板块
+          </h3>
+          <p class="text-[11px] text-gray-400 mt-0.5">将三级资产包直接提升为所属领域的全新二级分类</p>
+        </div>
+        <button onclick="closePromotePackageModal()" class="text-gray-400 hover:text-white p-1 rounded-lg">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div class="p-6 space-y-4">
+        <input type="hidden" id="promotePkgId" value="">
+        <input type="hidden" id="promotePkgDomainKey" value="">
+        <div class="bg-black/40 p-3 rounded-xl border border-gray-800/80">
+          <span class="text-[11px] text-gray-400 block mb-1">当前资产包:</span>
+          <span id="promotePkgNameLabel" class="text-xs font-bold text-white"></span>
+          <div class="text-[10px] text-indigo-400 mt-1 font-mono">所属领域: <span id="promotePkgDomainLabel"></span></div>
+        </div>
+        <div class="grid grid-cols-4 gap-3">
+          <div class="col-span-1">
+            <label class="block text-xs font-semibold text-gray-300 mb-1.5">图标:</label>
+            <input type="text" id="promoteSubIconInput" maxlength="4" value="📌" class="w-full text-center bg-gray-950 border border-gray-700 rounded-xl px-2 py-2 text-sm text-white focus:outline-none focus:border-indigo-500">
+          </div>
+          <div class="col-span-3">
+            <label class="block text-xs font-semibold text-gray-300 mb-1.5">新二级板块名称 <span class="text-rose-400">*</span>:</label>
+            <input type="text" id="promoteSubNameInput" class="w-full bg-gray-950 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500">
+          </div>
+        </div>
+      </div>
+      <div class="px-6 py-3 border-t border-gray-800 bg-gray-950/90 flex justify-end gap-2">
+        <button onclick="closePromotePackageModal()" class="px-4 py-1.5 rounded-lg text-xs text-gray-400 hover:text-white hover:bg-gray-800 transition">取消</button>
+        <button onclick="submitPromotePackage()" class="bg-amber-600 hover:bg-amber-500 px-4 py-1.5 rounded-lg text-xs font-semibold text-white shadow transition">确认升级为二级板块</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     let taxonomyData = null;
     let currentDomain = 'all';
@@ -1082,6 +1286,9 @@ HTML_DASHBOARD = r"""
                 <button onclick="openMovePackageModal(event, '${p.id}', '${p.name.replace(/'/g, "\\'")}', '${p.domain}', '${p.sub_category}')" class="text-gray-500 hover:text-indigo-400 p-1 rounded hover:bg-gray-800 transition" title="调整所属板块 (可点击选择或直接拖拽)">
                   <i class="fa-solid fa-arrows-up-down-left-right text-xs"></i>
                 </button>
+                <button onclick="openPromotePackageModal(event, '${p.id}', '${p.name.replace(/'/g, "\\'")}', '${p.domain}')" class="text-gray-500 hover:text-amber-400 p-1 rounded hover:bg-gray-800 transition" title="将此项目提升为二级子板块">
+                  <i class="fa-solid fa-star text-xs"></i>
+                </button>
                 <button onclick="openRenamePackageModal(event, '${p.id}', '${p.name.replace(/'/g, "\\'")}', '${(p.description || '').replace(/'/g, "\\'")}')" class="text-gray-500 hover:text-indigo-400 p-1 rounded hover:bg-gray-800 transition" title="重命名资产包与简介">
                   <i class="fa-solid fa-pen-to-square text-xs"></i>
                 </button>
@@ -1205,6 +1412,9 @@ HTML_DASHBOARD = r"""
                   <button onclick="openMovePackageModal(event, '${p.id}', '${p.name.replace(/'/g, "\\'")}', '${p.domain}', '${p.sub_category}')" class="text-[11px] px-2.5 py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg flex items-center gap-1.5 transition ml-1" title="调整所属板块 (可点击选择或直接拖拽)">
                     <i class="fa-solid fa-arrows-up-down-left-right text-indigo-400"></i> 移动板块
                   </button>
+                  <button onclick="openPromotePackageModal(event, '${p.id}', '${p.name.replace(/'/g, "\\'")}', '${p.domain}')" class="text-[11px] px-2.5 py-1 bg-amber-950/60 hover:bg-amber-900/80 text-amber-200 border border-amber-800/60 rounded-lg flex items-center gap-1.5 transition ml-1" title="将此项目提升为二级子板块">
+                    <i class="fa-solid fa-star text-amber-400"></i> 升为二级板块
+                  </button>
                 </div>
                 <p class="text-xs text-gray-400 mt-1 max-w-2xl">${p.description}</p>
               </div>
@@ -1289,6 +1499,9 @@ HTML_DASHBOARD = r"""
                     ` : ''}
                     <button onclick="openRenameSourceModal('${p.id}', '${s.file}', '${(s.title || '').replace(/'/g, "\\'")}')" class="text-gray-500 hover:text-indigo-400 p-1.5 rounded-lg hover:bg-gray-800 transition" title="重命名此资料标题">
                       <i class="fa-solid fa-pen-to-square"></i>
+                    </button>
+                    <button onclick="openSplitSourceModal('${p.id}', '${s.file}', '${(s.title || '').replace(/'/g, "\\'")}', '${p.domain}', '${p.sub_category}')" class="text-gray-500 hover:text-emerald-400 p-1.5 rounded-lg hover:bg-gray-800 transition" title="拆解为独立子项目/新资产包 (三级内容独立)">
+                      <i class="fa-solid fa-scissors"></i>
                     </button>
                     <button onclick="openMoveSourceModal('${p.id}', '${s.file}', '${(s.title || '').replace(/'/g, "\\'")}')" class="text-gray-500 hover:text-indigo-400 p-1.5 rounded-lg hover:bg-gray-800 transition" title="迁移至其他资产包">
                       <i class="fa-solid fa-arrow-right-to-bracket"></i>
@@ -2185,6 +2398,223 @@ HTML_DASHBOARD = r"""
       }
     }
 
+    // --- 16. 新建独立子项目 / 资产包 ---
+    function openCreatePackageModal() {
+      const domSelect = document.getElementById('createPkgDomainSelect');
+      domSelect.innerHTML = '';
+      if (taxonomyData && taxonomyData.domains) {
+        for (const [domKey, domInfo] of Object.entries(taxonomyData.domains)) {
+          const opt = document.createElement('option');
+          opt.value = domKey;
+          opt.innerText = `${domInfo.icon || '📁'} ${domInfo.name}`;
+          domSelect.appendChild(opt);
+        }
+      }
+      if (currentDomain !== 'all') {
+        domSelect.value = currentDomain;
+      }
+      handleCreatePkgDomainChange();
+      if (currentSubCategory !== 'all') {
+        document.getElementById('createPkgSubSelect').value = currentSubCategory;
+      }
+      document.getElementById('createPkgNameInput').value = '';
+      document.getElementById('createPkgDescInput').value = '';
+      document.getElementById('createPackageModal').classList.remove('hidden');
+      document.getElementById('createPkgNameInput').focus();
+    }
+
+    function closeCreatePackageModal() {
+      document.getElementById('createPackageModal').classList.add('hidden');
+    }
+
+    function handleCreatePkgDomainChange() {
+      const domKey = document.getElementById('createPkgDomainSelect').value;
+      const subSelect = document.getElementById('createPkgSubSelect');
+      subSelect.innerHTML = '';
+      if (!taxonomyData || !taxonomyData.domains[domKey]) return;
+      const subCats = taxonomyData.domains[domKey].sub_categories || {};
+      for (const [subKey, subInfo] of Object.entries(subCats)) {
+        const opt = document.createElement('option');
+        opt.value = subKey;
+        opt.innerText = `${subInfo.icon || '📌'} ${subInfo.name}`;
+        subSelect.appendChild(opt);
+      }
+    }
+
+    async function submitCreatePackage() {
+      const name = document.getElementById('createPkgNameInput').value.trim();
+      const description = document.getElementById('createPkgDescInput').value.trim();
+      const domain = document.getElementById('createPkgDomainSelect').value;
+      const sub_category = document.getElementById('createPkgSubSelect').value;
+      if (!name) {
+        alert('请输入子项目/资产包名称');
+        return;
+      }
+      try {
+        const res = await fetch('/api/packages/create', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ name, description, domain, sub_category })
+        });
+        const result = await res.json();
+        if (res.ok) {
+          showToast(`独立资产包「${name}」已创建！`);
+          closeCreatePackageModal();
+          await loadTaxonomy();
+          await loadPackages();
+          if (result.package_id) selectPackage(result.package_id);
+        } else {
+          showToast('创建资产包失败: ' + (result.detail || result.message), false);
+        }
+      } catch (err) {
+        showToast('创建资产包出错: ' + err.message, false);
+      }
+    }
+
+    // --- 17. 拆解单篇文献为独立子项目 ---
+    function openSplitSourceModal(fromPkgId, file, title, currentDom, currentSub) {
+      document.getElementById('splitSourceFromPkgId').value = fromPkgId;
+      document.getElementById('splitSourceFile').value = file;
+      document.getElementById('splitSourceCurrentTitleLabel').innerText = title;
+
+      // 智能提取推荐的项目包名称
+      let cleanTitle = title.replace(/^(用|把|基于|让)\s*/, '');
+      const parts = cleanTitle.split(/[：:—\-|，,]/);
+      let suggestedName = (parts[0] || title).trim();
+      if (suggestedName.length > 25) suggestedName = suggestedName.slice(0, 20);
+
+      document.getElementById('splitPkgNameInput').value = suggestedName;
+      document.getElementById('splitPkgDescInput').value = `围绕「${suggestedName}」的独立深度知识资产沉淀与工程实践`;
+
+      const domSelect = document.getElementById('splitDomainSelect');
+      domSelect.innerHTML = '';
+      if (taxonomyData && taxonomyData.domains) {
+        for (const [domKey, domInfo] of Object.entries(taxonomyData.domains)) {
+          const opt = document.createElement('option');
+          opt.value = domKey;
+          opt.innerText = `${domInfo.icon || '📁'} ${domInfo.name}`;
+          domSelect.appendChild(opt);
+        }
+      }
+      if (currentDom && taxonomyData.domains[currentDom]) {
+        domSelect.value = currentDom;
+      }
+      handleSplitDomainChange();
+      if (currentSub) {
+        document.getElementById('splitSubSelect').value = currentSub;
+      }
+
+      document.getElementById('splitSourceModal').classList.remove('hidden');
+      document.getElementById('splitPkgNameInput').focus();
+    }
+
+    function closeSplitSourceModal() {
+      document.getElementById('splitSourceModal').classList.add('hidden');
+    }
+
+    function handleSplitDomainChange() {
+      const domKey = document.getElementById('splitDomainSelect').value;
+      const subSelect = document.getElementById('splitSubSelect');
+      subSelect.innerHTML = '';
+      if (!taxonomyData || !taxonomyData.domains[domKey]) return;
+      const subCats = taxonomyData.domains[domKey].sub_categories || {};
+      for (const [subKey, subInfo] of Object.entries(subCats)) {
+        const opt = document.createElement('option');
+        opt.value = subKey;
+        opt.innerText = `${subInfo.icon || '📌'} ${subInfo.name}`;
+        subSelect.appendChild(opt);
+      }
+    }
+
+    async function submitSplitSource() {
+      const package_id = document.getElementById('splitSourceFromPkgId').value;
+      const file = document.getElementById('splitSourceFile').value;
+      const new_name = document.getElementById('splitPkgNameInput').value.trim();
+      const new_description = document.getElementById('splitPkgDescInput').value.trim();
+      const domain = document.getElementById('splitDomainSelect').value;
+      const sub_category = document.getElementById('splitSubSelect').value;
+
+      if (!new_name) {
+        alert('请输入新子项目名称');
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/packages/${package_id}/sources/split_to_new`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ file, new_name, new_description, domain, sub_category })
+        });
+        const result = await res.json();
+        if (res.ok) {
+          showToast(`已成功拆解并创建独立子项目「${new_name}」！`);
+          closeSplitSourceModal();
+          await loadTaxonomy();
+          await loadPackages();
+          if (result.new_package_id) selectPackage(result.new_package_id);
+        } else {
+          showToast('拆解失败: ' + (result.detail || result.message), false);
+        }
+      } catch (err) {
+        showToast('拆解出错: ' + err.message, false);
+      }
+    }
+
+    // --- 18. 升级资产包为二级子板块 ---
+    function openPromotePackageModal(e, pkgId, pkgName, domKey) {
+      if (e) e.stopPropagation();
+      document.getElementById('promotePkgId').value = pkgId;
+      document.getElementById('promotePkgNameLabel').innerText = pkgName;
+      document.getElementById('promotePkgDomainKey').value = domKey;
+
+      const domName = (taxonomyData && taxonomyData.domains[domKey]) ? taxonomyData.domains[domKey].name : domKey;
+      document.getElementById('promotePkgDomainLabel').innerText = domName;
+
+      // 提取建议的新板块名称
+      let clean = pkgName.split(/[（(]/)[0].trim();
+      document.getElementById('promoteSubNameInput').value = clean;
+      document.getElementById('promoteSubIconInput').value = '🎬';
+
+      document.getElementById('promotePackageModal').classList.remove('hidden');
+      document.getElementById('promoteSubNameInput').focus();
+    }
+
+    function closePromotePackageModal() {
+      document.getElementById('promotePackageModal').classList.add('hidden');
+    }
+
+    async function submitPromotePackage() {
+      const package_id = document.getElementById('promotePkgId').value;
+      const domain_key = document.getElementById('promotePkgDomainKey').value;
+      const new_sub_name = document.getElementById('promoteSubNameInput').value.trim();
+      const new_sub_icon = document.getElementById('promoteSubIconInput').value.trim() || '📌';
+
+      if (!new_sub_name) {
+        alert('请输入新二级板块名称');
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/packages/${package_id}/promote_to_subcategory`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ new_sub_name, new_sub_icon, domain_key })
+        });
+        const result = await res.json();
+        if (res.ok) {
+          showToast(`资产包已成功升级为二级子板块「${new_sub_icon} ${new_sub_name}」！`);
+          closePromotePackageModal();
+          await loadTaxonomy();
+          await loadPackages();
+          selectPackage(package_id);
+        } else {
+          showToast('升级失败: ' + (result.detail || result.message), false);
+        }
+      } catch (err) {
+        showToast('升级出错: ' + err.message, false);
+      }
+    }
+
     // 快捷键支持
     window.addEventListener('keydown', (e) => {
       if (e.key === '/' && document.activeElement.tagName !== 'INPUT') {
@@ -2200,6 +2630,9 @@ HTML_DASHBOARD = r"""
         closeRenameSourceModal();
         closeMoveSourceModal();
         closeRenameCategoryModal();
+        closeCreatePackageModal();
+        closeSplitSourceModal();
+        closePromotePackageModal();
       }
     });
 
